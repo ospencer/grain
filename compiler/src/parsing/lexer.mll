@@ -188,7 +188,10 @@ rule token = parse
   | "]" { RBRACK }
   | "^" { CARET }
   | "<" { LCARET }
+  | "<<" { LCARETLCARET }
   | ">" { RCARET }
+  | ">>" { RCARETRCARET }
+  | ">>>" { RCARETRCARETRCARET }
   | "^" { CARET }
   | "++" { PLUSPLUS }
   | "+" { PLUS }
@@ -196,6 +199,11 @@ rule token = parse
   | "*" { STAR }
   | "/" { SLASH }
   | "%" { PERCENT }
+  | "+=" { PLUSEQ }
+  | "-=" { DASHEQ }
+  | "*=" { STAREQ }
+  | "/=" { SLASHEQ }
+  | "%=" { PERCENTEQ }
   | "<=" { LESSEQ }
   | ">=" { GREATEREQ }
   | "&" { AMP }
@@ -203,6 +211,7 @@ rule token = parse
   | "|" { PIPE }
   | "||" { PIPEPIPE }
   | "!" { NOT }
+  | "!=" { NOTEQ }
   | "@" { AT }
   | '"'   { wrap_strlike_lexer (read_str (Buffer.create 16)) lexbuf }
   | '\'' { wrap_strlike_lexer (read_char (Buffer.create 4)) lexbuf }
