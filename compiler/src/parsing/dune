@@ -1,5 +1,9 @@
 (ocamllex lexer)
 
+(menhir
+ (modules parser)
+ (flags --explain --dump))
+
 (library
  (name grain_parsing)
  (public_name grain_parsing)
@@ -15,8 +19,3 @@
   yojson)
  (preprocess
   (pps ppx_sexp_conv ppx_deriving_yojson)))
-
-(menhir
- (modules parser)
- (flags
-  ("log-grammar" 1)))

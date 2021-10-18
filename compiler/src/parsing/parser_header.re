@@ -111,10 +111,10 @@ let mkid = ns => {
   mkloc @@ help(ns);
 };
 
-let mkid_expr = (dyp, ns) =>
-  Exp.ident(~loc=symbol_rloc(dyp), mkid(ns, symbol_rloc(dyp)));
+let mkid_expr = (loc, ns) =>
+  Exp.ident(~loc=to_loc(loc), mkid(ns, to_loc(loc)));
 
-let mkstr = (dyp, s) => mkloc(s, symbol_rloc(dyp));
+let mkstr = (loc, s) => mkloc(s, to_loc(loc));
 
 let make_program = statements => {
   let prog_loc = {
