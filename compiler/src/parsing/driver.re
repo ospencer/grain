@@ -59,7 +59,9 @@ let parse = (~name=?, lexbuf): Parsetree.parsed_program => {
   );
   let lexer = Wrapped_lexer.init(lexbuf);
   let token = _ => Wrapped_lexer.token(lexer);
-  {...parse_program(token, lexbuf), comments: Lexer.consume_comments()};
+  try({...parse_program(token, lexbuf), comments: Lexer.consume_comments()}) {
+  | Parser.Error => raise(Error())
+  };
 };
 
 let scan_for_imports = (~defer_errors=true, filename: string): list(string) => {
