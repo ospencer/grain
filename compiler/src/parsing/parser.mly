@@ -6,6 +6,9 @@ open Asttypes
 
 (* Including the Parser_extra file allows it to be written in Reason and have editor tooling *)
 include Parser_header
+
+(* https://github.com/ocaml/dune/issues/2450 *)
+module Grain_parsing = struct end
 %}
 
 
@@ -47,12 +50,14 @@ include Parser_header
 %token EXCEPT FROM
 %token EOL EOF
 
+// reserved tokens
+%token TRY CATCH COLONCOLON
+
 // Not a real token, this is injected by the lexer
 %token FUN
 
 /* Operator precedence may be found in /docs/contributor/operator_precedence.md */
 
-%right PLUSEQ DASHEQ STAREQ SLASHEQ PERCENTEQ
 %left PIPEPIPE
 %left AMPAMP
 %left PIPE
@@ -63,13 +68,8 @@ include Parser_header
 %left LCARETLCARET RCARETRCARET RCARETRCARETRCARET
 %left PLUS DASH PLUSPLUS
 %left STAR SLASH PERCENT
-%left COLON
-%right NOT
-%left DOT
-
 
 %right COMMA EOL
-%left TYPEID
 
 %start <Parsetree.parsed_program> program
 
@@ -326,11 +326,11 @@ app_arg_exprs :
 app_expr :
   | left_accessor_expr lparen app_arg_exprs? trailing_comma? rparen { Exp.apply ~loc:(to_loc $loc) $1 (Option.value ~default:[] $3) }
 
-dot_prefix(X) :
-  | dot X {$2}
+// dot_prefix(X) :
+//   | dot X {$2}
 
-ext_constructor :
-  | TYPEID dot_prefix(TYPEID)+ { (mkid ($1::$2)) (to_loc $loc) }
+// ext_constructor :
+//   | TYPEID dot_prefix(TYPEID)+ { (mkid ($1::$2)) (to_loc $loc) }
   // | TYPEID dot_prefix(TYPEID)+ { (mkid ($1::$2)) (to_loc $loc) }
 
 %inline plus_op :
@@ -410,11 +410,7 @@ ext_constructor :
   | amp_op
   | ampamp_op
   | pipe_op
-  | pipepipe_op
-  | pluseq_op
-  | dasheq_op
-  | stareq_op
-  | slasheq_op {$1}
+  | pipepipe_op {$1}
 
 prefix_op :
   | NOT { "!" }
@@ -430,8 +426,8 @@ special_op :
 %inline special_id :
   | lparen special_op rparen { $2 }
 
-%inline all_ids :
-  | ID | TYPEID | special_id {$1}
+// %inline all_ids :
+//   | ID | TYPEID | special_id {$1}
 
 %inline separated_list_trailing(sep, X) :
   | separated_list(sep, X) sep? {$1}
@@ -466,10 +462,6 @@ id :
 //   | longid { (mkid $1) (to_loc $loc) }
 
 simple_id :
-  | ID { (mkid [$1]) (to_loc $loc) }
-
-maybe_external_simple_id :
-  | modid dot ID { (mkid ($1 @ [$3])) (to_loc $loc) }
   | ID { (mkid [$1]) (to_loc $loc) }
 
 type_id :
@@ -685,12 +677,3 @@ toplevel_stmt :
 
 program :
   | opt_eols toplevel_stmts eos? EOF { make_program $2 }
-
-
-
-(* Partially apply the `program` from the parser to our parse_program method *)
-// let parse_program = parse_program program
-
-// %mli {
-// val parse_program : Lexing.lexbuf -> ((Parsetree.parsed_program * 'a) list)
-// }

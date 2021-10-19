@@ -2,7 +2,15 @@
 
 (menhir
  (modules parser)
- (flags --explain --dump))
+ (flags
+  --explain
+  --dump
+  --unused-token
+  TRY
+  --unused-token
+  CATCH
+  --unused-token
+  COLONCOLON))
 
 (library
  (name grain_parsing)

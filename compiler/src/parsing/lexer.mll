@@ -1,6 +1,7 @@
 {
   open Lexing
   open Parser
+  open Parser_header
   open Printf
 
   let lexbuf_loc {lex_start_p=loc_start; lex_curr_p=loc_end; _} =

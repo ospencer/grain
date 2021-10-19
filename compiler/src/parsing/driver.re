@@ -47,6 +47,8 @@ let () =
     | _ => None,
   );
 
+let parse_program = Parser_header.parse_program(Parser.program);
+
 let parse = (~name=?, lexbuf): Parsetree.parsed_program => {
   Option.iter(
     n => {
@@ -55,19 +57,9 @@ let parse = (~name=?, lexbuf): Parsetree.parsed_program => {
     },
     name,
   );
-  let loc_start =
-    Option.fold(
-      ~some=n => {...lexbuf.lex_start_p, pos_fname: n},
-      ~none=lexbuf.lex_start_p,
-      name,
-    );
-  let loc_end = lexbuf.lex_curr_p;
-  let startpos = {loc_start, loc_end, loc_ghost: true};
-  switch (Parser.parse_program(Lexer.token, lexbuf)) {
-  | [] => raise(Error(startpos, NoValidParse))
-  | [(x, _)] => {...x, comments: Lexer.consume_comments()}
-  | parses => raise(Error(startpos, AmbiguousParse(List.map(fst, parses))))
-  };
+  let lexer = Wrapped_lexer.init(lexbuf);
+  let token = _ => Wrapped_lexer.token(lexer);
+  {...parse_program(token, lexbuf), comments: Lexer.consume_comments()};
 };
 
 let scan_for_imports = (~defer_errors=true, filename: string): list(string) => {
