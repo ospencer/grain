@@ -672,8 +672,8 @@ toplevel_stmt :
   | primitive_stmt { Top.primitive ~loc:(to_loc $loc) Nonexported $1 }
   | exception_stmt { Top.grain_exception ~loc:(to_loc $loc) Nonexported $1 }
 
-%inline toplevel_stmts :
-  | separated_nonempty_list(eos, toplevel_stmt) { $1 }
+toplevel_stmts :
+  | separated_nonempty_list_trailing(eos, toplevel_stmt) { $1 }
 
 program :
   | opt_eols toplevel_stmts eos? EOF { make_program $2 }
