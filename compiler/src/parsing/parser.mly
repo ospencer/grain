@@ -69,7 +69,7 @@ module Grain_parsing = struct end
 %left PLUS DASH PLUSPLUS
 %left STAR SLASH PERCENT
 
-%right COMMA EOL
+%right COMMA EOL SEMI
 
 %start <Parsetree.parsed_program> program
 
@@ -433,7 +433,7 @@ special_op :
   | separated_list(sep, X) sep? {$1}
 
 %inline separated_nonempty_list_trailing(sep, X) :
-  | separated_nonempty_list(sep, X) sep? {$1}
+  | separated_nonempty_list(sep, X) ioption(sep) {$1}
 
 %inline separated_list_trailing_required(sep, X) :
   | separated_list(sep, X) sep {$1}
@@ -557,7 +557,7 @@ assign_binop_op :
   | percenteq_op {$1}
 
 assign_expr :
-  | left_accessor_expr opt_eols GETS opt_eols expr { Exp.box_assign ~loc:(to_loc $loc) $1 $5 } // FIXME
+  | left_accessor_expr GETS opt_eols expr { Exp.box_assign ~loc:(to_loc $loc) $1 $4 } // FIXME
   | id_expr equal expr { Exp.assign ~loc:(to_loc $loc) $1 $3 }
   | id_expr assign_binop_op opt_eols expr { Exp.assign ~loc:(to_loc $loc) $1 (Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc [$2]) [$1; $4]) }
   | record_set { $1 }
@@ -673,7 +673,9 @@ toplevel_stmt :
   | exception_stmt { Top.grain_exception ~loc:(to_loc $loc) Nonexported $1 }
 
 toplevel_stmts :
-  | separated_nonempty_list_trailing(eos, toplevel_stmt) { $1 }
+  | toplevel_stmts EOL toplevel_stmt { $3::$1 }
+  | toplevel_stmt { [$1] }
+  // | separated_nonempty_list(eos, toplevel_stmt) { $1 }
 
 program :
-  | opt_eols toplevel_stmts eos? EOF { make_program $2 }
+  | opt_eols toplevel_stmts ioption(eos) EOF { make_program (List.rev $2) }

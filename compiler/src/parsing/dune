@@ -21,7 +21,7 @@
 
 (menhir
  (modules unitActionsParser)
- (flags --table --external-tokens Parser))
+ (flags --table --external-tokens Parser --unused-tokens))
 
 (library
  (name grain_parsing)
