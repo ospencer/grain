@@ -17,6 +17,10 @@
 
 open Parsetree;
 
+type listitem('a) =
+  | ListItem('a)
+  | ListSpread('a);
+
 type id = loc(Identifier.t);
 type str = loc(string);
 type loc = Location.t;
@@ -95,7 +99,7 @@ module Pat: {
   let record:
     (~loc: loc=?, list((option((id, pattern)), Asttypes.closed_flag))) =>
     pattern;
-  let list: (~loc: loc=?, list(pattern), option(pattern)) => pattern;
+  let list: (~loc: loc=?, list(listitem(pattern))) => pattern;
   let constant: (~loc: loc=?, constant) => pattern;
   let constraint_: (~loc: loc=?, pattern, parsed_type) => pattern;
   let construct: (~loc: loc=?, id, list(pattern)) => pattern;
@@ -120,12 +124,7 @@ module Exp: {
     (~loc: loc=?, ~attributes: attributes=?, expression, id, expression) =>
     expression;
   let list:
-    (
-      ~loc: loc=?,
-      ~attributes: attributes=?,
-      list(expression),
-      option(expression)
-    ) =>
+    (~loc: loc=?, ~attributes: attributes=?, list(listitem(expression))) =>
     expression;
   let array:
     (~loc: loc=?, ~attributes: attributes=?, list(expression)) => expression;

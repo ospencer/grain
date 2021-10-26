@@ -180,26 +180,31 @@ ellipsis_prefix(X) :
 
 pattern :
   | pattern colon typ { Pat.constraint_ ~loc:(to_loc $loc) $1 $3 }
-  | UNDERSCORE { Pat.any ~loc:(to_loc $loc) () }
+  | FUN? UNDERSCORE { Pat.any ~loc:(to_loc $loc) () }
   | const { Pat.constant ~loc:(to_loc $loc) $1 }
   /* If the pattern uses an external ID, we know it's a constructor, not a variable */
   // | ext_constructor { Pat.construct ~loc:(to_loc $loc) $1 [] }
-  | ID { Pat.var ~loc:(to_loc $loc) (mkstr $loc $1) }
-  | special_id { Pat.var ~loc:(to_loc $loc) (mkstr $loc $1) }
+  | FUN? ID { Pat.var ~loc:(to_loc $loc) (mkstr $loc $2) }
+  | FUN? special_id { Pat.var ~loc:(to_loc $loc) (mkstr $loc $2) }
   | primitive_ { Pat.var ~loc:(to_loc $loc) (mkstr $loc $1) }
-  | lparen tuple_patterns rparen { Pat.tuple ~loc:(to_loc $loc) $2 }
+  // HACK: Some match cases look like functions
+  | FUN? lparen tuple_patterns rparen { Pat.tuple ~loc:(to_loc $loc) $3 }
   | lbrack rcaret patterns rbrack { Pat.array ~loc:(to_loc $loc) $3 }
   | lbrack rcaret rbrack { Pat.array ~loc:(to_loc $loc) [] }
-  | lparen pattern rparen { $2 }
+  | FUN? lparen pattern rparen { $3 }
   | lbrace record_patterns rbrace { Pat.record ~loc:(to_loc $loc) $2 }
-  | type_id lparen patterns rparen { Pat.construct ~loc:(to_loc $loc) $1 $3 }
+  | type_id FUN? lparen patterns rparen { Pat.construct ~loc:(to_loc $loc) $1 $4 }
   | type_id { Pat.construct ~loc:(to_loc $loc) $1 [] }
-  | lbrack patterns comma_prefix(ellipsis_prefix(any_or_var_pat))? rbrack { Pat.list ~loc:(to_loc $loc) $2 $3 }
-  | lbrack ellipsis_prefix(any_or_var_pat)? rbrack { Pat.list ~loc:(to_loc $loc) [] $2 }
+  | lbrack separated_list(comma, list_item_pat) trailing_comma? rbrack { Pat.list ~loc:(to_loc $loc) $2 }
+  // | lbrack ellipsis_prefix(any_or_var_pat)? rbrack { Pat.list ~loc:(to_loc $loc) [] $2 }
 
 any_or_var_pat :
   | UNDERSCORE { Pat.any ~loc:(to_loc $loc) () }
   | ID { Pat.var ~loc:(to_loc $loc) (mkstr $loc $1) }
+
+list_item_pat :
+  | ELLIPSIS pattern { ListSpread $2 }
+  | pattern { ListItem $1 }
 
 comma_prefix(X) :
   | comma X {$2}
@@ -226,7 +231,7 @@ data_typ :
 typ :
   /* Convenience: Parens optional for single-argument functions */
   | data_typ arrow typ { Typ.arrow ~loc:(to_loc $loc) [$1] $3 }
-  | ID arrow typ { Typ.arrow ~loc:(to_loc $loc) [(Typ.var $1)] $3 }
+  | FUN ID arrow typ { Typ.arrow ~loc:(to_loc $loc) [(Typ.var $2)] $4 }
   | FUN lparen typs? rparen arrow typ { Typ.arrow ~loc:(to_loc $loc) (Option.value ~default:[] $3) $6 }
   | lparen tuple_typs rparen { Typ.tuple ~loc:(to_loc $loc) $2 }
   | lparen typ rparen { $2 }
@@ -530,13 +535,24 @@ match_branches :
 match_expr :
   | MATCH lparen expr rparen lbrace match_branches rbrace { Exp.match_ ~loc:(to_loc $loc) $3 $6 }
 
-list_expr_ending :
-  | trailing_comma? { None }
-  | comma ELLIPSIS expr { Some $3 }
+// list_expr_ending :
+//   | trailing_comma? { None }
+//   | comma ELLIPSIS expr { Some $3 }
+
+// list_expr_ending :
+//   | trailing_comma? { None }
+//   | comma ELLIPSIS expr { Some $3 }
+
+// list_spread :
+//   | comma ELLIPSIS expr { $3 }
+
+list_item :
+  | ELLIPSIS expr { ListSpread $2 }
+  | expr { ListItem $1 }
 
 list_expr :
-  | lbrack rbrack { Exp.list ~loc:(to_loc $loc) [] None }
-  | lbrack expr comma_prefix(expr)* list_expr_ending rbrack { Exp.list ~loc:(to_loc $loc) ($2::$3) $4 }
+  // | lbrack rbrack { Exp.list ~loc:(to_loc $loc) [] None }
+  | lbrack separated_list(comma, list_item) trailing_comma? rbrack { Exp.list ~loc:(to_loc $loc) $2 }
 
 array_expr :
   | lbrack rcaret rbrack { Exp.array ~loc:(to_loc $loc) [] }
@@ -673,7 +689,7 @@ toplevel_stmt :
   | exception_stmt { Top.grain_exception ~loc:(to_loc $loc) Nonexported $1 }
 
 toplevel_stmts :
-  | toplevel_stmts EOL toplevel_stmt { $3::$1 }
+  | toplevel_stmts eos toplevel_stmt { $3::$1 }
   | toplevel_stmt { [$1] }
   // | separated_nonempty_list(eos, toplevel_stmt) { $1 }
 

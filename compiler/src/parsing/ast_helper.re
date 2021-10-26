@@ -17,6 +17,10 @@
 
 open Parsetree;
 
+type listitem('a) =
+  | ListItem('a)
+  | ListSpread('a);
+
 type id = loc(Identifier.t);
 type str = loc(string);
 type loc = Location.t;
@@ -145,13 +149,28 @@ module Pat = {
   let constant = (~loc=?, a) => mk(~loc?, PPatConstant(a));
   let constraint_ = (~loc=?, a, b) => mk(~loc?, PPatConstraint(a, b));
   let construct = (~loc=?, a, b) => mk(~loc?, PPatConstruct(a, b));
-  let list = (~loc=?, a, r) => {
-    let base = Option.value(~default=construct(ident_empty, []), r);
-    List.fold_right(
-      (pat, acc) => construct(ident_cons, [pat, acc]),
-      a,
-      base,
-    );
+  let list = (~loc=?, a) => {
+    let empty = construct(ident_empty, []);
+    let a = List.rev(a);
+    switch (a) {
+    | [] => empty
+    | [base, ...rest] =>
+      let base =
+        switch (base) {
+        | ListItem(pat) => construct(ident_cons, [pat, empty])
+        | ListSpread(pat) => pat
+        };
+      List.fold_left(
+        (acc, pat) => {
+          switch (pat) {
+          | ListItem(pat) => construct(ident_cons, [pat, acc])
+          | _ => assert(false) //FIXME
+          }
+        },
+        base,
+        rest,
+      );
+    };
   };
   let or_ = (~loc=?, a, b) => mk(~loc?, PPatOr(a, b));
   let alias = (~loc=?, a, b) => mk(~loc?, PPatAlias(a, b));
@@ -213,15 +232,29 @@ module Exp = {
     mk(~loc?, ~attributes?, PExpApp(a, b));
   let block = (~loc=?, ~attributes=?, a) =>
     mk(~loc?, ~attributes?, PExpBlock(a));
-  let list = (~loc=?, ~attributes=?, a, base) => {
+  let list = (~loc=?, ~attributes=?, a) => {
     let empty = ident(~loc?, ident_empty);
     let cons = ident(ident_cons);
-    let base = Option.value(~default=empty, base);
-    List.fold_right(
-      (expr, acc) => apply(~attributes?, cons, [expr, acc]),
-      a,
-      base,
-    );
+    let a = List.rev(a);
+    switch (a) {
+    | [] => empty
+    | [base, ...rest] =>
+      let base =
+        switch (base) {
+        | ListItem(expr) => apply(~attributes?, cons, [expr, empty])
+        | ListSpread(expr) => expr
+        };
+      List.fold_left(
+        (acc, expr) => {
+          switch (expr) {
+          | ListItem(expr) => apply(~attributes?, cons, [expr, acc])
+          | _ => assert(false) //FIXME
+          }
+        },
+        base,
+        rest,
+      );
+    };
   };
   let null = (~loc=?, ~attributes=?, ()) =>
     mk(~loc?, ~attributes?, PExpNull);

@@ -212,8 +212,12 @@ let parse_program_for_syntax_error = (~name=?, lexbuf, source) => {
   /* Allocate and initialize a lexing buffer. */
   /* Wrap the lexer and lexbuf together into a supplier, that is, a
      function of type [unit -> token * position * position]. */
+  let lexer = Wrapped_lexer.init(lexbuf);
   let supplier =
-    I.lexer_lexbuf_to_supplier(inspect_token(Lexer.token), lexbuf);
+    I.lexer_lexbuf_to_supplier(
+      inspect_token(_ => Wrapped_lexer.token(lexer)),
+      lexbuf,
+    );
   /* Equip the supplier with a two-place buffer that records the positions
      of the last two tokens. This is useful when a syntax error occurs, as
      these are the token just before and just after the error. */
