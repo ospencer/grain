@@ -69,7 +69,8 @@ module Grain_parsing = struct end
 %left PLUS DASH PLUSPLUS
 %left STAR SLASH PERCENT
 
-%right COMMA EOL SEMI
+%right EOL
+%right COMMA SEMI
 
 %start <Parsetree.parsed_program> program
 
@@ -81,8 +82,12 @@ module Grain_parsing = struct end
 %inline eols :
   | eol+ { () }
 
+// eols :
+//   | eols EOL
+//   | EOL { () }
+
 %inline opt_eols :
-  | eol* { () }
+  | eols? { () }
 
 %inline eos :
   | eols { () }
@@ -640,8 +645,14 @@ record_exprs_inner :
   | record_exprs_inner trailing_comma? { $1 }
   | record_field comma {[$1]}
 
+block_body_inner :
+  | block_body_inner eos block_body_expr { $3::$1 }
+  | block_body_expr { [$1] }
+
 block_body :
-  | block_body_expr block_body_stmt* SEMI? { $1::$2 }
+  // | block_body_expr block_body_stmt* SEMI? { $1::$2 }
+  // | separated_nonempty_list(eos, block_body_expr) ioption(eos) { $1 }
+  | rev(block_body_inner) ioption(eos) { $1 }
 
 file_path :
   | STRING { Location.mkloc $1 (to_loc $loc) }
