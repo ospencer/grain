@@ -18,14 +18,19 @@ open Parser;
 
 type positioned('a) = ('a, Lexing.position, Lexing.position);
 
+type fn_ctx =
+  | DiscoverFunctions
+  | IgnoreFunctions;
+
 type t = {
   lexbuf: Lexing.lexbuf,
   mutable queued_tokens: list(positioned(token)),
   mutable queued_exn: option(exn),
+  mutable fn_ctx_stack: list(fn_ctx),
 };
 
 let init = lexbuf => {
-  {lexbuf, queued_tokens: [], queued_exn: None};
+  {lexbuf, queued_tokens: [], queued_exn: None, fn_ctx_stack: []};
 };
 
 let lexbuf = state => state.lexbuf;
@@ -72,24 +77,56 @@ and lex_fast_forward = (state, stop, acc) =>
   | tok => lex_fast_forward_step(state, stop, acc, tok)
   };
 
-let rec lex_balanced_step = (~no_fun, state, closing, acc, tok) => {
+let push_fn_ctx = (state, ctx) => {
+  state.fn_ctx_stack = [ctx, ...state.fn_ctx_stack];
+};
+
+let pop_fn_ctx = state => {
+  switch (state.fn_ctx_stack) {
+  | [hd, ...tl] => state.fn_ctx_stack = tl
+  | _ => assert(false)
+  };
+};
+
+let ignore_fns = state => {
+  switch (state.fn_ctx_stack) {
+  | [IgnoreFunctions, ...tl] => true
+  | _ => false
+  };
+};
+
+let rec lex_balanced_step = (state, closing, acc, tok) => {
   let lexbuf = state.lexbuf;
   let acc = [save_triple(lexbuf, tok), ...acc];
   switch (tok, closing) {
   | (RPAREN, RPAREN)
   | (RBRACE, RBRACE)
-  | (RBRACK, RBRACK) => acc
+  | (RBRACK, RBRACK) =>
+    pop_fn_ctx(state);
+    acc;
   | (RPAREN | RBRACE | RBRACK | EOF, _) =>
     raise(Lex_balanced_failed(acc, None))
   | (LBRACK, _) =>
-    lex_balanced(state, closing, lex_balanced(state, RBRACK, acc))
+    lex_balanced(
+      state,
+      closing,
+      lex_balanced(~push=DiscoverFunctions, state, RBRACK, acc),
+    )
   | (LBRACE, _) =>
-    lex_balanced(state, closing, lex_balanced(state, RBRACE, acc))
-  | (LPAREN, _) when no_fun =>
-    lex_balanced(state, closing, lex_balanced(state, RPAREN, acc))
+    lex_balanced(
+      state,
+      closing,
+      lex_balanced(~push=DiscoverFunctions, state, RBRACE, acc),
+    )
+  | (LPAREN, _) when ignore_fns(state) =>
+    lex_balanced(
+      state,
+      closing,
+      lex_balanced(~push=DiscoverFunctions, state, RPAREN, acc),
+    )
   | (LPAREN, _) =>
     let rparen =
-      try(lex_balanced(state, RPAREN, [])) {
+      try(lex_balanced(~push=DiscoverFunctions, state, RPAREN, [])) {
       | Lex_balanced_failed(rparen, None) =>
         raise(Lex_balanced_failed(rparen @ acc, None))
       };
@@ -103,24 +140,29 @@ let rec lex_balanced_step = (~no_fun, state, closing, acc, tok) => {
         } else {
           acc;
         };
-      lex_balanced_step(~no_fun=false, state, closing, rparen @ acc, tok');
+      lex_balanced_step(state, closing, rparen @ acc, tok');
     };
   | (MATCH, _) =>
     lex_balanced(
       state,
       closing,
       lex_balanced(
-        ~no_fun=true,
+        ~push=IgnoreFunctions,
         state,
         RBRACE,
         lex_fast_forward(
           state,
           LBRACE,
-          lex_balanced(state, RPAREN, lex_fast_forward(state, LPAREN, acc)),
+          lex_balanced(
+            ~push=DiscoverFunctions,
+            state,
+            RPAREN,
+            lex_fast_forward(state, LPAREN, acc),
+          ),
         ),
       ),
     )
-  | (ID(_) | UNDERSCORE, _) when !no_fun =>
+  | (ID(_) | UNDERSCORE, _) when !ignore_fns(state) =>
     switch (token(state)) {
     | exception exn => raise(Lex_balanced_failed(acc, Some(exn)))
     | tok' =>
@@ -130,21 +172,22 @@ let rec lex_balanced_step = (~no_fun, state, closing, acc, tok) => {
         } else {
           acc;
         };
-      lex_balanced_step(~no_fun=false, state, closing, acc, tok');
+      lex_balanced_step(state, closing, acc, tok');
     }
-  | _ => lex_balanced(~no_fun, state, closing, acc)
+  | _ => lex_balanced(state, closing, acc)
   };
 }
 
-and lex_balanced = (~no_fun=false, state, closing, acc) => {
+and lex_balanced = (~push=?, state, closing, acc) => {
+  Option.iter(push_fn_ctx(state), push);
   switch (token(state)) {
   | exception exn => raise(Lex_balanced_failed(acc, Some(exn)))
-  | tok => lex_balanced_step(~no_fun, state, closing, acc, tok)
+  | tok => lex_balanced_step(state, closing, acc, tok)
   };
 }
 
 and lookahead_fun = (state, (tok, _, _) as lparen) =>
-  switch (lex_balanced(state, RPAREN, [])) {
+  switch (lex_balanced(~push=DiscoverFunctions, state, RPAREN, [])) {
   | exception (Lex_balanced_failed(tokens, exn)) =>
     state.queued_tokens = List.rev(tokens);
     state.queued_exn = exn;
@@ -174,7 +217,7 @@ and lookahead_match = state => {
     state.queued_exn = exn;
     assert(false); // FIXME
   | first_ff_tokens =>
-    switch (lex_balanced(state, RPAREN, [])) {
+    switch (lex_balanced(~push=DiscoverFunctions, state, RPAREN, [])) {
     | exception (Lex_balanced_failed(tokens, exn)) =>
       state.queued_tokens = List.rev(tokens @ first_ff_tokens);
       state.queued_exn = exn;
@@ -186,7 +229,7 @@ and lookahead_match = state => {
         state.queued_exn = Some(exn);
         assert(false); // FIXME
       | second_ff_tokens =>
-        switch (lex_balanced(~no_fun=true, state, RBRACE, [])) {
+        switch (lex_balanced(~push=IgnoreFunctions, state, RBRACE, [])) {
         | exception (Lex_balanced_failed(more_tokens, exn)) =>
           state.queued_tokens =
             List.rev(

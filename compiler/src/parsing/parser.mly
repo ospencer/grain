@@ -131,7 +131,7 @@ trailing_comma :
   | DOT opt_eols { () }
 
 arrow :
-  | opt_eols ARROW opt_eols { () }
+  | ARROW opt_eols { () }
 
 thickarrow :
   | opt_eols THICKARROW opt_eols { () }
