@@ -121,7 +121,7 @@ rcaret :
   | COMMA opt_eols { () }
 
 /* prevents abiguity between EOL characters after the final comma and before the closing character */
-trailing_comma :
+%inline trailing_comma :
   | COMMA { () }
 
 %inline colon :
@@ -230,8 +230,8 @@ record_pattern :
   | id { Some($1, Pat.var ~loc:(to_loc $loc) (mkstr $loc (Identifier.last $1.txt))), Closed }
 
 data_typ :
-  | type_id lcaret typs rcaret { Typ.constr $1 $3 }
-  | type_id { Typ.constr $1 [] }
+  | type_id lcaret typs rcaret { Typ.constr ~loc:(to_loc $loc) $1 $3 }
+  | type_id { Typ.constr ~loc:(to_loc $loc) $1 [] }
 
 typ :
   /* Convenience: Parens optional for single-argument functions */
@@ -240,7 +240,7 @@ typ :
   | FUN lparen typs? rparen arrow typ { Typ.arrow ~loc:(to_loc $loc) (Option.value ~default:[] $3) $6 }
   | lparen tuple_typs rparen { Typ.tuple ~loc:(to_loc $loc) $2 }
   | lparen typ rparen { $2 }
-  | ID { Typ.var $1 }
+  | ID { Typ.var ~loc:(to_loc $loc) $1 }
   | data_typ { $1 }
 
 typs :
@@ -317,15 +317,18 @@ data_label :
 data_labels :
   | lbrace data_label comma_prefix(data_label)* trailing_comma? rbrace { $2::$3 }
 
+id_typ :
+  | ID { Typ.var ~loc:(to_loc $loc) $1 }
+
 id_vec :
-  | lcaret ID comma_prefix(ID)* rcaret {$2::$3}
+  | lcaret id_typ comma_prefix(id_typ)* rcaret {$2::$3}
 
 data_declaration :
-  | ENUM TYPEID id_vec? data_constructors { Dat.variant ~loc:(to_loc $loc) (mkstr $loc $2) (List.map Typ.var (Option.value ~default:[] $3)) $4 }
-  | RECORD TYPEID id_vec? data_labels { Dat.record ~loc:(to_loc $loc) (mkstr $loc $2) (List.map Typ.var (Option.value ~default:[] $3)) $4 }
+  | ENUM TYPEID id_vec? data_constructors { Dat.variant ~loc:(to_loc $loc) (mkstr $loc $2) (Option.value ~default:[] $3) $4 }
+  | RECORD TYPEID id_vec? data_labels { Dat.record ~loc:(to_loc $loc) (mkstr $loc $2) (Option.value ~default:[] $3) $4 }
 
 prim1_expr :
-  | NOT non_assign_expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc ["!"]) [$2] }
+  | NOT non_assign_expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc($1) ["!"]) [$2] }
 
 paren_expr :
   | lparen expr rparen { $2 }
@@ -440,7 +443,7 @@ special_op :
 //   | ID | TYPEID | special_id {$1}
 
 %inline separated_list_trailing(sep, X) :
-  | separated_list(sep, X) sep? {$1}
+  | separated_list(sep, X) ioption(sep) {$1}
 
 %inline separated_nonempty_list_trailing(sep, X) :
   | separated_nonempty_list(sep, X) ioption(sep) {$1}
@@ -499,7 +502,7 @@ block_or_expr :
 
 lam_expr :
   | FUN lparen patterns? rparen thickarrow block_or_expr { Exp.lambda ~loc:(to_loc $loc) (Option.value ~default:[] $3) $6 }
-  | FUN ID thickarrow block_or_expr { Exp.lambda ~loc:(to_loc $loc) [Pat.var ~loc:(to_loc $loc($2)) (mkstr $loc $2)] $4 }
+  | FUN ID thickarrow block_or_expr { Exp.lambda ~loc:(to_loc $loc) [Pat.var ~loc:(to_loc $loc($2)) (mkstr $loc($2) $2)] $4 }
 
 attribute :
   | AT id_str opt_eols {$2}
@@ -517,7 +520,7 @@ else_expr :
   | ELSE opt_eols block_or_expr { $3 }
 
 if_expr :
-  | IF lparen expr rparen opt_eols block_or_expr ioption(else_expr) { Exp.if_ ~loc:(to_loc $loc) $3 $6 (Option.value ~default:(Exp.block []) $7) }
+  | IF lparen expr rparen opt_eols block_or_expr ioption(else_expr) { Exp.if_ ~loc:(to_loc $loc) $3 $6 (Option.value ~default:(Exp.block ~loc:(to_loc $loc($7)) []) $7) }
 
 // one_sided_if_expr :
 //   | IF lparen expr rparen opt_eols block_or_expr { Exp.if_ ~loc:(to_loc $loc) $3 $6 (Exp.block []) }
@@ -564,9 +567,9 @@ array_expr :
   | lbrack rcaret opt_eols expr comma_prefix(expr)* trailing_comma? rbrack { Exp.array ~loc:(to_loc $loc) ($4::$5) }
 
 stmt_expr :
-  | THROW expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc ["throw"]) [$2] }
-  | ASSERT expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc ["assert"]) [$2] }
-  | FAIL expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc ["fail"]) [$2] }
+  | THROW expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc($1) ["throw"]) [$2] }
+  | ASSERT expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc($1) ["assert"]) [$2] }
+  | FAIL expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc($1) ["fail"]) [$2] }
   | CONTINUE { Exp.continue ~loc:(to_loc $loc) () }
   | BREAK { Exp.break ~loc:(to_loc $loc) () }
 
@@ -580,7 +583,7 @@ assign_binop_op :
 assign_expr :
   | left_accessor_expr GETS opt_eols expr { Exp.box_assign ~loc:(to_loc $loc) $1 $4 } // FIXME
   | id_expr equal expr { Exp.assign ~loc:(to_loc $loc) $1 $3 }
-  | id_expr assign_binop_op opt_eols expr { Exp.assign ~loc:(to_loc $loc) $1 (Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc [$2]) [$1; $4]) }
+  | id_expr assign_binop_op opt_eols expr { Exp.assign ~loc:(to_loc $loc) $1 (Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc($2) [$2]) [$1; $4]) }
   | record_set { $1 }
   | array_set { $1 }
 
@@ -614,9 +617,20 @@ block_body_expr :
 %inline block_body_stmt :
   | eos block_body_expr { $2 }
 
+left_assoc_separated_nonempty_list(sep, X) :
+  | left_assoc_separated_nonempty_list(sep, X) sep X { $1 @ [$3] }
+  | X { [$1] }
+
+%inline tuple_expr_ending :
+  | ioption(eols) left_assoc_separated_nonempty_list(comma, expr) ioption(trailing_comma) { $2 }
+
 tuple_exprs :
-  | expr comma { [$1] }
-  | expr comma_prefix(expr)+ trailing_comma? { $1::$2 }
+  // | expr comma { [$1] }
+  // | expr comma_prefix(expr)+ ioption(trailing_comma) { $1::$2 }
+  | expr COMMA ioption(tuple_expr_ending) { $1::(Option.value ~default:[] $3) }
+  // | separated_nonempty_list_trailing_required(comma, expr) { $1 }
+  // | expr comma separated_list_trailing(comma, expr) { $1::$3 }
+  // | separated_nonempty_list(comma, expr) { $1 }
 
 array_get :
   | left_accessor_expr lbrack expr rbrack { Exp.array_get ~loc:(to_loc $loc) $1 $3 }
@@ -625,7 +639,7 @@ array_set :
   | left_accessor_expr lbrack expr rbrack equal expr { Exp.array_set ~loc:(to_loc $loc) $1 $3 $6 }
 
 record_get :
-  | left_accessor_expr dot simple_id { Exp.record_get $1 $3 }
+  | left_accessor_expr dot simple_id { Exp.record_get ~loc:(to_loc $loc) $1 $3 }
 
 record_set :
   | left_accessor_expr dot simple_id equal expr { Exp.record_set ~loc:(to_loc $loc) $1 $3 $5 }

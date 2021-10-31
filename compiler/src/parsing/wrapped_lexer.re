@@ -24,13 +24,20 @@ type fn_ctx =
 
 type t = {
   lexbuf: Lexing.lexbuf,
+  mutable lexbuf_p: (Lexing.position, Lexing.position),
   mutable queued_tokens: list(positioned(token)),
   mutable queued_exn: option(exn),
   mutable fn_ctx_stack: list(fn_ctx),
 };
 
 let init = lexbuf => {
-  {lexbuf, queued_tokens: [], queued_exn: None, fn_ctx_stack: []};
+  {
+    lexbuf,
+    lexbuf_p: (lexbuf.lex_start_p, lexbuf.lex_curr_p),
+    queued_tokens: [],
+    queued_exn: None,
+    fn_ctx_stack: [],
+  };
 };
 
 let lexbuf = state => state.lexbuf;
@@ -77,6 +84,20 @@ and lex_fast_forward = (state, stop, acc) =>
   | tok => lex_fast_forward_step(state, stop, acc, tok)
   };
 
+let rec next_non_eol_token = (state, acc) => {
+  switch (token(state)) {
+  | exception exn => raise(Lex_balanced_failed(acc, Some(exn)))
+  | EOL as tok =>
+    let lexbuf = state.lexbuf;
+    let acc = [save_triple(lexbuf, tok), ...acc];
+    next_non_eol_token(state, acc);
+  | tok =>
+    let lexbuf = state.lexbuf;
+    let acc = [save_triple(lexbuf, tok), ...acc];
+    (tok, acc);
+  };
+};
+
 let push_fn_ctx = (state, ctx) => {
   state.fn_ctx_stack = [ctx, ...state.fn_ctx_stack];
 };
@@ -95,7 +116,41 @@ let ignore_fns = state => {
   };
 };
 
-let rec lex_balanced_step = (state, closing, acc, tok) => {
+let rec check_lparen_fn = (state, closing, acc) => {
+  let rparen =
+    try(lex_balanced(~push=DiscoverFunctions, state, RPAREN, [])) {
+    | Lex_balanced_failed(rparen, None) =>
+      raise(Lex_balanced_failed(rparen @ acc, None))
+    };
+
+  switch (token(state)) {
+  | exception exn => raise(Lex_balanced_failed(rparen @ acc, Some(exn)))
+  | tok' =>
+    let acc =
+      if (is_triggering_token(tok')) {
+        inject_fun(acc);
+      } else {
+        acc;
+      };
+    lex_balanced_step(state, closing, rparen @ acc, tok');
+  };
+}
+
+and check_id_fn = (state, closing, acc) => {
+  switch (token(state)) {
+  | exception exn => raise(Lex_balanced_failed(acc, Some(exn)))
+  | tok' =>
+    let acc =
+      if (is_triggering_token(tok')) {
+        inject_fun(acc);
+      } else {
+        acc;
+      };
+    lex_balanced_step(state, closing, acc, tok');
+  };
+}
+
+and lex_balanced_step = (state, closing, acc, tok) => {
   let lexbuf = state.lexbuf;
   let acc = [save_triple(lexbuf, tok), ...acc];
   switch (tok, closing) {
@@ -124,23 +179,19 @@ let rec lex_balanced_step = (state, closing, acc, tok) => {
       closing,
       lex_balanced(~push=DiscoverFunctions, state, RPAREN, acc),
     )
-  | (LPAREN, _) =>
-    let rparen =
-      try(lex_balanced(~push=DiscoverFunctions, state, RPAREN, [])) {
-      | Lex_balanced_failed(rparen, None) =>
-        raise(Lex_balanced_failed(rparen @ acc, None))
-      };
-
-    switch (token(state)) {
-    | exception exn => raise(Lex_balanced_failed(rparen @ acc, Some(exn)))
-    | tok' =>
-      let acc =
-        if (is_triggering_token(tok')) {
-          inject_fun(acc);
-        } else {
-          acc;
-        };
-      lex_balanced_step(state, closing, rparen @ acc, tok');
+  | (LPAREN, _) => check_lparen_fn(state, closing, acc)
+  | (THICKARROW, _) when ignore_fns(state) =>
+    // When in a context where we're not looking for toplevel functions,
+    // the thing that appears immediately after an arrow could be a
+    // function, so we need to check for that
+    let (tok', tokens) = next_non_eol_token(state, []);
+    switch (tok') {
+    | LPAREN => check_lparen_fn(state, closing, tokens @ acc)
+    | ID(_)
+    | UNDERSCORE => check_id_fn(state, closing, tokens @ acc)
+    | _ =>
+      // "Unlex" this token and recurse normally
+      lex_balanced_step(state, closing, List.tl(tokens) @ acc, tok')
     };
   | (MATCH, _) =>
     lex_balanced(
@@ -163,17 +214,7 @@ let rec lex_balanced_step = (state, closing, acc, tok) => {
       ),
     )
   | (ID(_) | UNDERSCORE, _) when !ignore_fns(state) =>
-    switch (token(state)) {
-    | exception exn => raise(Lex_balanced_failed(acc, Some(exn)))
-    | tok' =>
-      let acc =
-        if (is_triggering_token(tok')) {
-          inject_fun(acc);
-        } else {
-          acc;
-        };
-      lex_balanced_step(state, closing, acc, tok');
-    }
+    check_id_fn(state, closing, acc)
   | _ => lex_balanced(state, closing, acc)
   };
 }
@@ -287,7 +328,24 @@ let token = state => {
   };
 };
 
+let save_lexer_positions = state => {
+  state.lexbuf_p = (state.lexbuf.lex_start_p, state.lexbuf.lex_curr_p);
+};
+let set_lexer_positions = (state, lex_start_p, lex_curr_p) => {
+  state.lexbuf.lex_start_p = lex_start_p;
+  state.lexbuf.lex_curr_p = lex_curr_p;
+};
+let restore_lexer_positions = state => {
+  let (lex_start_p, lex_curr_p) = state.lexbuf_p;
+  set_lexer_positions(state, lex_start_p, lex_curr_p);
+};
+
 let token = state => {
-  let (token, _, _) = token(state);
+  // Menhir will read lexer positions to determine token locations
+  // We spoof these locations and reset when we need to lex the next token
+  restore_lexer_positions(state);
+  let (token, start_p, curr_p) = token(state);
+  save_lexer_positions(state);
+  set_lexer_positions(state, start_p, curr_p);
   token;
 };
