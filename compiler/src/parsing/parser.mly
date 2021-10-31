@@ -217,9 +217,13 @@ comma_prefix(X) :
 patterns :
   | pattern comma_prefix(pattern)* trailing_comma? { $1::$2 }
 
+%inline tuple_pattern_ending :
+  | ioption(eols) left_assoc_separated_nonempty_list(comma, pattern) ioption(trailing_comma) { $2 }
+
 tuple_patterns :
-  | pattern comma { [$1] }
-  | pattern comma_prefix(pattern)+ trailing_comma? { $1::$2 }
+  // | pattern comma { [$1] }
+  // | pattern comma_prefix(pattern)+ trailing_comma? { $1::$2 }
+  | pattern COMMA ioption(tuple_pattern_ending) { $1::(Option.value ~default:[] $3) }
 
 record_patterns :
   | record_pattern comma_prefix(record_pattern)* trailing_comma? { $1::$2 }
