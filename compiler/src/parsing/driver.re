@@ -2,50 +2,7 @@
 open Lexing;
 open Location;
 
-type error =
-  | AmbiguousParse(list(Parsetree.parsed_program))
-  | NoValidParse;
-
-let report_error = ppf =>
-  fun
-  | AmbiguousParse(parses) =>
-    if (Grain_utils.Config.verbose^
-        || Grain_utils.Config.parser_debug_level^ > 0) {
-      Format.fprintf(
-        ppf,
-        "The Grain compiler had trouble parsing your program. Here were the potential parses:@\n@[<v>%a@]",
-        ppf =>
-          List.iter(x =>
-            Format.fprintf(
-              ppf,
-              "@[%s@]%,",
-              Sexplib.Sexp.to_string_hum @@
-              Parsetree.sexp_of_parsed_program(x),
-            )
-          ),
-        parses,
-      );
-    } else {
-      Format.fprintf(
-        ppf,
-        "The Grain compiler had trouble parsing your program.",
-      );
-    }
-  | NoValidParse =>
-    Format.fprintf(
-      ppf,
-      "The Grain compiler was unable to parse your program. If you see this message, please file an issue at https://github.com/grain-lang/grain",
-    );
-
-exception Error(Location.t, error);
-
-let () =
-  Location.register_error_of_exn(
-    fun
-    | Error(loc, err) =>
-      Some(Location.error_of_printer(loc, report_error, err))
-    | _ => None,
-  );
+exception SyntaxError(Location.t, string);
 
 let apply_filename_to_lexbuf = (name, lexbuf) => {
   lexbuf.lex_curr_p = {...lexbuf.lex_curr_p, pos_fname: name};
@@ -193,7 +150,8 @@ let succeed = _v => assert(false);
 
 let fail = (text, buffer, checkpoint: I.checkpoint(_)) => {
   /* Indicate where in the input file the error occurred. */
-  let location = L.range(E.last(buffer));
+  let (loc_start, loc_end) = E.last(buffer);
+  let location = {loc_start, loc_end, loc_ghost: false};
   /* Show the tokens just before and just after the error. */
   let indication =
     Printf.sprintf("Syntax error %s.\n", E.show(show(text), buffer));
@@ -203,8 +161,9 @@ let fail = (text, buffer, checkpoint: I.checkpoint(_)) => {
   /* Expand away the $i keywords that might appear in the message. */
   let message = E.expand(get(text, checkpoint), message);
   /* Show these three components. */
-  Printf.eprintf("%s%s%s%!", location, indication, message);
-  exit(1);
+  raise(
+    SyntaxError(location, Printf.sprintf("%s%s%!", indication, message)),
+  );
 };
 
 let parse_program_for_syntax_error = (~name=?, lexbuf, source) => {
@@ -301,3 +260,16 @@ let scan_for_imports = (~defer_errors=true, filename: string): list(string) => {
   // FIXME: we're exiting instead of throwing a real error here yikes
   };
 };
+
+let print_syntax_error =
+  Printf.(
+    Location.(
+      fun
+      | SyntaxError(loc, msg) => {
+          Some(errorf(~loc, "%s", msg));
+        }
+      | _ => None
+    )
+  );
+
+let _ = Location.register_error_of_exn(print_syntax_error);
