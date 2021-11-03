@@ -182,7 +182,7 @@ annotated_expr :
   | non_binop_expr annotation? { Option.fold ~none:$1 ~some:(fun ann -> Exp.constraint_ ~loc:(to_loc $loc) $1 ann) $2 }
 
 binop_expr :
-  | non_stmt_expr infix_op opt_eols non_stmt_expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc [$2]) [$1; $4] }
+  | non_stmt_expr infix_op opt_eols non_stmt_expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc($2) [$2]) [$1; $4] }
 
 ellipsis_prefix(X) :
   | ELLIPSIS X {$2}
