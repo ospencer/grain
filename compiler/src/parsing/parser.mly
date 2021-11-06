@@ -71,8 +71,9 @@ module Grain_parsing = struct end
 
 
 %right EOL
-%right COMMA SEMI
+%right COMMA
 
+%nonassoc _if
 %nonassoc ELSE
 
 
@@ -528,12 +529,12 @@ let_expr :
   | attributes LET REC MUT value_binds { Exp.let_ ~loc:(to_loc $loc) ~attributes:$1 Recursive Mutable $5 }
   | attributes LET MUT value_binds { Exp.let_ ~loc:(to_loc $loc) ~attributes:$1 Nonrecursive Mutable $4 }
 
-else_expr :
-  | opt_eols block_or_expr { $2 }
+%inline else_expr :
+  | ELSE opt_eols block_or_expr { $3 }
 
 if_expr :
   // | IF lparen expr rparen opt_eols block_or_expr { Exp.if_ ~loc:(to_loc $loc) $3 $6 (Exp.block []) }
-  | IF lparen expr rparen opt_eols block_or_expr ioption(preceded(ELSE, else_expr)) { Exp.if_ ~loc:(to_loc $loc) $3 $6 (Option.value ~default:(Exp.block ~loc:(to_loc $loc($7)) []) $7) }
+  | IF lparen expr rparen opt_eols block_or_expr ioption(else_expr) %prec _if { Exp.if_ ~loc:(to_loc $loc) $3 $6 (Option.value ~default:(Exp.block ~loc:(to_loc $loc($7)) []) $7) }
 
 // one_sided_if_expr :
 //   | IF lparen expr rparen opt_eols block_or_expr { Exp.if_ ~loc:(to_loc $loc) $3 $6 (Exp.block []) }
