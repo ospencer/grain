@@ -58,6 +58,8 @@ module Grain_parsing = struct end
 
 /* Operator precedence may be found in /docs/contributor/operator_precedence.md */
 
+%nonassoc _below_infix
+
 %left PIPEPIPE
 %left AMPAMP
 %left PIPE
@@ -243,10 +245,10 @@ record_pattern :
 
 data_typ :
   | type_id lcaret typs rcaret { Typ.constr ~loc:(to_loc $loc) $1 $3 }
-  | type_id { Typ.constr ~loc:(to_loc $loc) $1 [] }
+  // Resolve Foo < n > abiguity in favor of the type vector
+  | type_id %prec _below_infix { Typ.constr ~loc:(to_loc $loc) $1 [] }
 
 typ :
-  /* Convenience: Parens optional for single-argument functions */
   | data_typ arrow typ { Typ.arrow ~loc:(to_loc $loc) [$1] $3 }
   | FUN ID arrow typ { Typ.arrow ~loc:(to_loc $loc) [(Typ.var $2)] $4 }
   | FUN lparen typs? rparen arrow typ { Typ.arrow ~loc:(to_loc $loc) (Option.value ~default:[] $3) $6 }
@@ -471,8 +473,8 @@ special_op :
 %inline separated_nonempty_list_trailing_required(sep, X) :
   | separated_nonempty_list(sep, X) sep {$1}
 
-modid :
-  | lseparated_nonempty_list(dot, TYPEID) %prec DOT { $1 }
+%inline modid :
+  | lseparated_nonempty_list(dot, TYPEID) { $1 }
 
 non_modid :
   | ID
