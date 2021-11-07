@@ -161,7 +161,7 @@ and lex_balanced_step = (state, closing, acc, tok) => {
     acc;
   | (RPAREN | RBRACE | RBRACK | EOF, _) =>
     raise(Lex_balanced_failed(acc, None))
-  | (LBRACK, _) =>
+  | (LBRACK | LBRACKRCARET, _) =>
     lex_balanced(
       state,
       closing,

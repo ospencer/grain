@@ -26,7 +26,7 @@ module Grain_parsing = struct end
 %token <string> TYPEID
 %token <string> STRING
 %token <string> CHAR
-%token LBRACK RBRACK LPAREN RPAREN LBRACE RBRACE LCARET RCARET
+%token LBRACK LBRACKRCARET RBRACK LPAREN RPAREN LBRACE RBRACE LCARET RCARET
 %token LCARETLCARET RCARETRCARET RCARETRCARETRCARET
 %token CARET
 %token COMMA SEMI AS
@@ -70,8 +70,8 @@ module Grain_parsing = struct end
 %left STAR SLASH PERCENT
 
 
-%right EOL
-%right COMMA
+// %right EOL
+%right SEMI EOL COMMA DOT COLON
 
 %nonassoc _if
 %nonassoc ELSE
@@ -92,14 +92,17 @@ module Grain_parsing = struct end
 //   | EOL { () }
 
 %inline opt_eols :
-  | eols? { () }
+  | ioption(eols) { () }
 
-%inline eos :
+eos :
   | eols { () }
-  | SEMI opt_eols { () }
+  | SEMI opt_eols %prec SEMI { () }
 
 lbrack :
   | LBRACK opt_eols { () }
+
+lbrackrcaret :
+  | LBRACKRCARET opt_eols { () }
 
 rbrack :
   | opt_eols RBRACK { () }
@@ -114,7 +117,7 @@ lbrace :
   | LBRACE opt_eols { () }
 
 rbrace :
-  | opt_eols RBRACE { () }
+  | eols? RBRACE { () }
 
 lcaret :
   | LCARET opt_eols { () }
@@ -199,18 +202,18 @@ pattern :
   | primitive_ { Pat.var ~loc:(to_loc $loc) (mkstr $loc $1) }
   // HACK: Some match cases look like functions
   | FUN? lparen tuple_patterns rparen { Pat.tuple ~loc:(to_loc $loc) $3 }
-  | lbrack rcaret patterns rbrack { Pat.array ~loc:(to_loc $loc) $3 }
-  | lbrack rcaret rbrack { Pat.array ~loc:(to_loc $loc) [] }
+  | lbrackrcaret patterns rbrack { Pat.array ~loc:(to_loc $loc) $2 }
+  | lbrackrcaret rbrack { Pat.array ~loc:(to_loc $loc) [] }
   | FUN? lparen pattern rparen { $3 }
   | lbrace record_patterns rbrace { Pat.record ~loc:(to_loc $loc) $2 }
   | type_id FUN? lparen patterns rparen { Pat.construct ~loc:(to_loc $loc) $1 $4 }
   | type_id { Pat.construct ~loc:(to_loc $loc) $1 [] }
-  | lbrack separated_list(comma, list_item_pat) trailing_comma? rbrack { Pat.list ~loc:(to_loc $loc) $2 }
+  | lbrack lseparated_list(comma, list_item_pat) trailing_comma? rbrack { Pat.list ~loc:(to_loc $loc) $2 }
   // | lbrack ellipsis_prefix(any_or_var_pat)? rbrack { Pat.list ~loc:(to_loc $loc) [] $2 }
 
-any_or_var_pat :
-  | UNDERSCORE { Pat.any ~loc:(to_loc $loc) () }
-  | ID { Pat.var ~loc:(to_loc $loc) (mkstr $loc $1) }
+// any_or_var_pat :
+//   | UNDERSCORE { Pat.any ~loc:(to_loc $loc) () }
+//   | ID { Pat.var ~loc:(to_loc $loc) (mkstr $loc $1) }
 
 list_item_pat :
   | ELLIPSIS pattern { ListSpread $2 }
@@ -220,10 +223,10 @@ comma_prefix(X) :
   | comma X {$2}
 
 patterns :
-  | pattern comma_prefix(pattern)* trailing_comma? { $1::$2 }
+  | lseparated_nonempty_list(comma, pattern) trailing_comma? { $1 }
 
 %inline tuple_pattern_ending :
-  | ioption(eols) left_assoc_separated_nonempty_list(comma, pattern) ioption(trailing_comma) { $2 }
+  | ioption(eols) lseparated_nonempty_list(comma, pattern) ioption(trailing_comma) { $2 }
 
 tuple_patterns :
   // | pattern comma { [$1] }
@@ -231,7 +234,7 @@ tuple_patterns :
   | pattern COMMA ioption(tuple_pattern_ending) { $1::(Option.value ~default:[] $3) }
 
 record_patterns :
-  | record_pattern comma_prefix(record_pattern)* trailing_comma? { $1::$2 }
+  | lseparated_nonempty_list(comma, record_pattern) trailing_comma? { $1 }
 
 record_pattern :
   | UNDERSCORE { None, Open }
@@ -253,11 +256,12 @@ typ :
   | data_typ { $1 }
 
 typs :
-  | separated_nonempty_list_trailing(comma, typ) { $1 }
+  // | separated_nonempty_list_trailing(comma, typ) { $1 }
+  | lseparated_nonempty_list(comma, typ) trailing_comma? { $1 }
   // | typ comma_prefix(typ)* trailing_comma? { $1::$2 }
 
 %inline tuple_typ_ending :
-  | ioption(eols) left_assoc_separated_nonempty_list(comma, typ) ioption(trailing_comma) { $2 }
+  | ioption(eols) lseparated_nonempty_list(comma, typ) ioption(trailing_comma) { $2 }
 
 tuple_typs :
   | typ COMMA ioption(tuple_typ_ending) { $1::(Option.value ~default:[] $3) }
@@ -271,7 +275,7 @@ value_binds :
   | value_bind comma_prefix(value_bind)* { $1::$2 }
 
 import_exception :
-  | EXCEPT lbrace left_assoc_separated_nonempty_list(comma, id) trailing_comma? rbrace {$3}
+  | EXCEPT lbrace lseparated_nonempty_list(comma, id) trailing_comma? rbrace {$3}
 
 as_prefix(X) :
   | AS X {$2}
@@ -280,7 +284,7 @@ aliasable(X) :
   | X as_prefix(X)? {($1, $2)}
 
 import_ids :
-  | left_assoc_separated_nonempty_list(comma, aliasable(id)) trailing_comma? {$1}
+  | lseparated_nonempty_list(comma, aliasable(id)) trailing_comma? {$1}
 
 import_shape :
   | id { PImportModule $1 }
@@ -288,7 +292,7 @@ import_shape :
   | lbrace import_ids? rbrace { PImportValues (Option.value ~default:[] $2) }
 
 import_stmt :
-  | IMPORT left_assoc_separated_nonempty_list(comma, import_shape) trailing_comma? FROM file_path { Imp.mk ~loc:(to_loc $loc) $2 $5 }
+  | IMPORT lseparated_nonempty_list(comma, import_shape) trailing_comma? FROM file_path { Imp.mk ~loc:(to_loc $loc) $2 $5 }
 
 data_declaration_stmt :
   // TODO: Attach attributes to the node
@@ -320,7 +324,7 @@ data_constructor :
   | lbrack ELLIPSIS rbrack lparen typs? rparen { CDecl.tuple ~loc:(to_loc $loc) (mkstr $loc "[...]") (Option.value ~default:[] $5) }
 
 data_constructors :
-  | lbrace left_assoc_separated_nonempty_list(comma, data_constructor) trailing_comma? rbrace { $2 }
+  | lbrace lseparated_nonempty_list(comma, data_constructor) trailing_comma? rbrace { $2 }
   // | lbrace data_constructor comma_prefix(data_constructor)* trailing_comma? rbrace { $2::$3 }
 
 data_label :
@@ -328,7 +332,7 @@ data_label :
   | MUT simple_id colon typ { LDecl.mk ~loc:(to_loc $loc) $2 $4 Mutable }
 
 data_labels :
-  | lbrace left_assoc_separated_nonempty_list(comma, data_label) trailing_comma? rbrace { $2 }
+  | lbrace lseparated_nonempty_list(comma, data_label) trailing_comma? rbrace { $2 }
 
 id_typ :
   | ID { Typ.var ~loc:(to_loc $loc) $1 }
@@ -346,11 +350,11 @@ prim1_expr :
 paren_expr :
   | lparen expr rparen { $2 }
 
-app_arg_exprs :
-  | expr comma_prefix(expr)* { $1::$2 }
+// app_arg_exprs :
+//   | lseparated_list(comma, expr) { $1 }
 
 app_expr :
-  | left_accessor_expr lparen app_arg_exprs? trailing_comma? rparen { Exp.apply ~loc:(to_loc $loc) $1 (Option.value ~default:[] $3) }
+  | left_accessor_expr lparen lseparated_list(comma, expr) trailing_comma? rparen { Exp.apply ~loc:(to_loc $loc) $1 $3 }
 
 // dot_prefix(X) :
 //   | dot X {$2}
@@ -468,8 +472,7 @@ special_op :
   | separated_nonempty_list(sep, X) sep {$1}
 
 modid :
-  | modid dot TYPEID { List.append $1 [$3] }
-  | TYPEID { [$1] }
+  | lseparated_nonempty_list(dot, TYPEID) %prec DOT { $1 }
 
 non_modid :
   | ID
@@ -481,7 +484,7 @@ id :
   // | TYPEID dot longid { $1::$3 }
   // | all_ids opt_eols { [$1] }
   | modid dot non_modid { mkid (List.append $1 $3) (to_loc $loc) }
-  | modid { (mkid $1) (to_loc $loc) }
+  | modid %prec DOT { (mkid $1) (to_loc $loc) }
   | non_modid { (mkid $1) (to_loc $loc) }
 
 // id :
@@ -495,7 +498,8 @@ type_id :
   // | TYPEID dot_prefix(TYPEID)* { (mkid ($1::$2)) (to_loc $loc) }
 
 id_expr :
-  | id { Exp.ident ~loc:(to_loc $loc) $1 }
+  // Force any following colon to cause a shift
+  | id %prec COLON { Exp.ident ~loc:(to_loc $loc) $1 }
 
 simple_expr :
   | const { Exp.constant ~loc:(to_loc $loc) $1 }
@@ -542,8 +546,12 @@ if_expr :
 while_expr :
   | WHILE lparen expr rparen block { Exp.while_ ~loc:(to_loc $loc) $3 $5 }
 
+for_inner_expr :
+  | %prec EOL { None }
+  | expr { Some $1 }
+
 for_expr :
-  | FOR lparen block_body_expr? opt_eols SEMI opt_eols expr? opt_eols SEMI opt_eols expr? rparen block { Exp.for_ ~loc:(to_loc $loc) $3 $7 $11 $13 }
+  | FOR lparen block_body_expr? opt_eols SEMI opt_eols for_inner_expr opt_eols SEMI opt_eols for_inner_expr rparen block { Exp.for_ ~loc:(to_loc $loc) $3 $7 $11 $13 }
 
 when_guard :
   | WHEN expr {$2}
@@ -552,7 +560,7 @@ match_branch :
   | pattern when_guard? thickarrow expr { Mb.mk ~loc:(to_loc $loc) $1 $4 $2 }
 
 match_branches :
-  | left_assoc_separated_nonempty_list(comma, match_branch) trailing_comma? { $1 }
+  | lseparated_nonempty_list(comma, match_branch) trailing_comma? { $1 }
 
 match_expr :
   | MATCH lparen expr rparen lbrace match_branches rbrace { Exp.match_ ~loc:(to_loc $loc) $3 $6 }
@@ -574,11 +582,11 @@ list_item :
 
 list_expr :
   // | lbrack rbrack { Exp.list ~loc:(to_loc $loc) [] None }
-  | lbrack separated_list(comma, list_item) trailing_comma? rbrack { Exp.list ~loc:(to_loc $loc) $2 }
+  | lbrack lseparated_list(comma, list_item) trailing_comma? rbrack { Exp.list ~loc:(to_loc $loc) $2 }
 
 array_expr :
-  | lbrack rcaret rbrack { Exp.array ~loc:(to_loc $loc) [] }
-  | lbrack rcaret opt_eols expr comma_prefix(expr)* trailing_comma? rbrack { Exp.array ~loc:(to_loc $loc) ($4::$5) }
+  | lbrackrcaret rbrack { Exp.array ~loc:(to_loc $loc) [] }
+  | lbrackrcaret opt_eols lseparated_nonempty_list(comma, expr) trailing_comma? rbrack { Exp.array ~loc:(to_loc $loc) $3 }
 
 stmt_expr :
   | THROW expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc($1) ["throw"]) [$2] }
@@ -628,19 +636,31 @@ block_body_expr :
   | let_expr    { $1 }
   | expr  { $1 }
 
-%inline block_body_stmt :
-  | eos block_body_expr { $2 }
+// %inline block_body_stmt :
+//   | eos block_body_expr { $2 }
 
-left_assoc_separated_nonempty_list(sep, X) :
-  | left_assoc_separated_nonempty_list(sep, X) sep X { $1 @ [$3] }
+lseparated_nonempty_list(sep, X) :
+  | lseparated_nonempty_list(sep, X) sep X { $1 @ [$3] }
   | X { [$1] }
 
+%inline lseparated_list(sep, X) :
+  | { [] }
+  | lseparated_nonempty_list(sep, X) { $1 }
+
+// tuple_expr_list :
+//   | tuple_expr_list expr comma { $1 @ [$2] }
+//   | expr comma { [$1] }
+
+// special_eols :
+//   | eols? %prec EOL { () }
+
 %inline tuple_expr_ending :
-  | ioption(eols) left_assoc_separated_nonempty_list(comma, expr) ioption(trailing_comma) { $2 }
+  | ioption(eols) lseparated_nonempty_list(comma, expr) trailing_comma? { $2 }
 
 tuple_exprs :
   // | expr comma { [$1] }
   // | expr comma_prefix(expr)+ ioption(trailing_comma) { $1::$2 }
+  // | tuple_expr_list expr? { Option.fold ~some:(fun x -> $1 @ [x]) ~none:$1 $2 }
   | expr COMMA ioption(tuple_expr_ending) { $1::(Option.value ~default:[] $3) }
   // | separated_nonempty_list_trailing_required(comma, expr) { $1 }
   // | expr comma separated_list_trailing(comma, expr) { $1::$3 }
@@ -661,26 +681,33 @@ record_set :
 %inline record_field_value :
   | colon expr {$2}
 
-record_field :
-  | id record_field_value { $1, $2 }
+punned_record_field :
   | id { $1, (Exp.ident ~loc:(to_loc $loc) $1) }
 
-record_exprs_inner :
-  | record_exprs_inner comma record_field { $1 @ [$3] }
-  | record_field comma record_field { [$1; $3] }
+non_punned_record_field :
+  | id record_field_value { $1, $2 }
 
-%inline record_exprs :
-  | record_exprs_inner trailing_comma? { $1 }
-  | record_field comma {[$1]}
+record_field :
+  | punned_record_field { $1 }
+  | non_punned_record_field %prec COMMA { $1 }
 
-block_body_inner :
-  | block_body_inner eos block_body_expr { $3::$1 }
-  | block_body_expr { [$1] }
+// record_exprs_inner :
+//   | record_exprs_inner comma record_field { $1 @ [$3] }
+//   | record_field comma record_field { [$1; $3] }
+
+record_exprs :
+  // Don't ever parse {x} as a record
+  | non_punned_record_field trailing_comma? { [$1] }
+  | record_field comma lseparated_nonempty_list(comma, record_field) trailing_comma? { $1::$3 }
+
+// block_body_inner :
+//   | block_body_inner eos block_body_expr { $3::$1 }
+//   | block_body_expr { [$1] }
 
 block_body :
   // | block_body_expr block_body_stmt* SEMI? { $1::$2 }
   // | separated_nonempty_list(eos, block_body_expr) ioption(eos) { $1 }
-  | rev(block_body_inner) ioption(eos) { $1 }
+  | lseparated_nonempty_list(eos, block_body_expr) ioption(eos) %prec SEMI { $1 }
 
 file_path :
   | STRING { Location.mkloc $1 (to_loc $loc) }

@@ -186,6 +186,7 @@ rule token = parse
   | "{" { LBRACE }
   | "}" { RBRACE }
   | "[" { LBRACK }
+  | "[>" { LBRACKRCARET }
   | "]" { RBRACK }
   | "^" { CARET }
   | "<" { LCARET }

@@ -60,6 +60,7 @@ let string_of_tok =
   | LCARETLCARET => "LCARETLCARET"
   | LCARET => "LCARET"
   | LBRACK => "LBRACK"
+  | LBRACKRCARET => "LBRACKRCARET"
   | LBRACE => "LBRACE"
   | ISNT => "ISNT"
   | IS => "IS"
