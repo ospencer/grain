@@ -101,22 +101,22 @@ eos :
   | SEMI opt_eols %prec SEMI { () }
 
 lbrack :
-  | LBRACK opt_eols { () }
+  | LBRACK opt_eols %prec EOL { () }
 
 lbrackrcaret :
-  | LBRACKRCARET opt_eols { () }
+  | LBRACKRCARET opt_eols %prec EOL { () }
 
 rbrack :
   | opt_eols RBRACK { () }
 
 lparen :
-  | LPAREN opt_eols { () }
+  | LPAREN opt_eols %prec EOL { () }
 
 rparen :
   | opt_eols RPAREN { () }
 
 lbrace :
-  | LBRACE opt_eols { () }
+  | LBRACE opt_eols %prec EOL { () }
 
 rbrace :
   | eols? RBRACE { () }
@@ -150,7 +150,6 @@ equal :
   | EQUAL opt_eols { () }
 
 const :
-  // Allow shifting of a SLASH token to potentially parse a rational literal
   | dash_op? NUMBER_INT { Const.number (PConstNumberInt (if Option.is_some $1 then "-" ^ $2 else $2)) }
   | dash_op? NUMBER_FLOAT { Const.number (PConstNumberFloat (if Option.is_some $1 then "-" ^ $2 else $2)) }
   // | dash_op? NUMBER_INT slash_op dash_op? NUMBER_INT { Const.number (PConstNumberRational ((if Option.is_some $1 then "-" ^ $2 else $2), (if Option.is_some $4 then "-" ^ $5 else $5))) }

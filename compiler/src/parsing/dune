@@ -2,7 +2,7 @@
 
 (menhir
  (modules parser)
- (flags --explain --dump --unused-tokens))
+ (flags --explain --unused-tokens))
 
 ;; The following two rules create a copy of the file parser.mly named
 ;; unitActionsParser.mly. This is a copy of the grammar where the semantic
@@ -21,7 +21,12 @@
 
 (menhir
  (modules unitActionsParser)
- (flags --table --external-tokens Parser --unused-tokens))
+ (flags
+  --table
+  --external-tokens
+  Parser
+  --unused-tokens
+  --unused-precedence-levels))
 
 (library
  (name grain_parsing)
