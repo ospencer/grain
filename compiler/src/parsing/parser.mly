@@ -150,9 +150,10 @@ equal :
   | EQUAL opt_eols { () }
 
 const :
+  // Allow shifting of a SLASH token to potentially parse a rational literal
   | dash_op? NUMBER_INT { Const.number (PConstNumberInt (if Option.is_some $1 then "-" ^ $2 else $2)) }
   | dash_op? NUMBER_FLOAT { Const.number (PConstNumberFloat (if Option.is_some $1 then "-" ^ $2 else $2)) }
-  | dash_op? NUMBER_INT SLASH opt_eols dash_op? NUMBER_INT { Const.number (PConstNumberRational ((if Option.is_some $1 then "-" ^ $2 else $2), (if Option.is_some $5 then "-" ^ $6 else $6))) }
+  // | dash_op? NUMBER_INT slash_op dash_op? NUMBER_INT { Const.number (PConstNumberRational ((if Option.is_some $1 then "-" ^ $2 else $2), (if Option.is_some $4 then "-" ^ $5 else $5))) }
   | dash_op? INT32 { Const.int32 (if Option.is_some $1 then "-" ^ $2 else $2) }
   | dash_op? INT64 { Const.int64 (if Option.is_some $1 then "-" ^ $2 else $2) }
   | dash_op? FLOAT32 { Const.float32 (if Option.is_some $1 then "-" ^ $2 else $2) }
@@ -169,7 +170,8 @@ const :
 
 expr :
   | stmt_expr { $1 }
-  | non_stmt_expr { $1 }
+  // allow infix operators to cause a shift
+  | non_stmt_expr %prec _below_infix { $1 }
 
 non_binop_expr :
   | lam_expr { $1 }
@@ -181,14 +183,16 @@ non_stmt_expr :
   | binop_expr { $1 }
   | annotated_expr { $1 }
 
-%inline annotation :
-  | colon typ { $2 }
+annotation :
+  | %prec COLON { None }
+  | colon typ { Some $2 }
+
 
 annotated_expr :
-  | non_binop_expr annotation? { Option.fold ~none:$1 ~some:(fun ann -> Exp.constraint_ ~loc:(to_loc $loc) $1 ann) $2 }
+  | non_binop_expr annotation { Option.fold ~none:$1 ~some:(fun ann -> Exp.constraint_ ~loc:(to_loc $loc) $1 ann) $2 }
 
 binop_expr :
-  | non_stmt_expr infix_op opt_eols non_stmt_expr { Exp.apply ~loc:(to_loc $loc) (mkid_expr $loc($2) [$2]) [$1; $4] }
+  | non_stmt_expr infix_op opt_eols non_stmt_expr { Exp.binop ~loc:(to_loc $loc) (mkid_expr $loc($2) [$2]) [$1; $4] }
 
 ellipsis_prefix(X) :
   | ELLIPSIS X {$2}

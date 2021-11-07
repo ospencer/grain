@@ -230,6 +230,23 @@ module Exp = {
     mk(~loc?, ~attributes?, PExpLambda(a, b));
   let apply = (~loc=?, ~attributes=?, a, b) =>
     mk(~loc?, ~attributes?, PExpApp(a, b));
+  let binop = (~loc=?, ~attributes=?, a, b) => {
+    switch (a, b) {
+    | (
+        {pexp_desc: PExpId({txt: IdentName("/")})},
+        [
+          {pexp_desc: PExpConstant(PConstNumber(PConstNumberInt(x)))},
+          {pexp_desc: PExpConstant(PConstNumber(PConstNumberInt(y)))},
+        ],
+      ) =>
+      constant(
+        ~loc?,
+        ~attributes?,
+        PConstNumber(PConstNumberRational(x, y)),
+      )
+    | _ => mk(~loc?, ~attributes?, PExpApp(a, b))
+    };
+  };
   let block = (~loc=?, ~attributes=?, a) =>
     mk(~loc?, ~attributes?, PExpBlock(a));
   let list = (~loc=?, ~attributes=?, a) => {
