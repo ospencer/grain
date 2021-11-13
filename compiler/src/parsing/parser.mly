@@ -645,9 +645,12 @@ block_body_expr :
 // %inline block_body_stmt :
 //   | eos block_body_expr { $2 }
 
-lseparated_nonempty_list(sep, X) :
-  | lseparated_nonempty_list(sep, X) sep X { $1 @ [$3] }
+lseparated_nonempty_list_inner(sep, X) :
+  | lseparated_nonempty_list_inner(sep, X) sep X { $3::$1 }
   | X { [$1] }
+
+%inline lseparated_nonempty_list(sep, X) :
+  | lseparated_nonempty_list_inner(sep, X) { List.rev $1 }
 
 %inline lseparated_list(sep, X) :
   | { [] }
