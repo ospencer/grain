@@ -150,17 +150,17 @@ equal :
   | EQUAL opt_eols { () }
 
 const :
-  | dash_op? NUMBER_INT { Const.number (PConstNumberInt (if Option.is_some $1 then "-" ^ $2 else $2)), if Option.is_some $1 then $loc else $loc($2) }
-  | dash_op? NUMBER_FLOAT { Const.number (PConstNumberFloat (if Option.is_some $1 then "-" ^ $2 else $2)), if Option.is_some $1 then $loc else $loc($2) }
+  | dash_op? NUMBER_INT { Const.number (PConstNumberInt (if Option.is_some $1 then "-" ^ $2 else $2)), $sloc }
+  | dash_op? NUMBER_FLOAT { Const.number (PConstNumberFloat (if Option.is_some $1 then "-" ^ $2 else $2)), $sloc }
   // | dash_op? NUMBER_INT slash_op dash_op? NUMBER_INT { Const.number (PConstNumberRational ((if Option.is_some $1 then "-" ^ $2 else $2), (if Option.is_some $4 then "-" ^ $5 else $5))) }
-  | dash_op? INT32 { Const.int32 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
-  | dash_op? INT64 { Const.int64 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
-  | dash_op? FLOAT32 { Const.float32 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
-  | dash_op? FLOAT64 { Const.float64 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
-  | dash_op? WASMI32 { Const.wasmi32 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
-  | dash_op? WASMI64 { Const.wasmi64 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
-  | dash_op? WASMF32 { Const.wasmf32 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
-  | dash_op? WASMF64 { Const.wasmf64 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
+  | dash_op? INT32 { Const.int32 (if Option.is_some $1 then "-" ^ $2 else $2), $sloc }
+  | dash_op? INT64 { Const.int64 (if Option.is_some $1 then "-" ^ $2 else $2), $sloc }
+  | dash_op? FLOAT32 { Const.float32 (if Option.is_some $1 then "-" ^ $2 else $2), $sloc }
+  | dash_op? FLOAT64 { Const.float64 (if Option.is_some $1 then "-" ^ $2 else $2), $sloc }
+  | dash_op? WASMI32 { Const.wasmi32 (if Option.is_some $1 then "-" ^ $2 else $2), $sloc }
+  | dash_op? WASMI64 { Const.wasmi64 (if Option.is_some $1 then "-" ^ $2 else $2), $sloc }
+  | dash_op? WASMF32 { Const.wasmf32 (if Option.is_some $1 then "-" ^ $2 else $2), $sloc }
+  | dash_op? WASMF64 { Const.wasmf64 (if Option.is_some $1 then "-" ^ $2 else $2), $sloc }
   | TRUE { Const.bool true, $loc }
   | FALSE { Const.bool false, $loc }
   | VOID { Const.void, $loc }
@@ -198,20 +198,21 @@ ellipsis_prefix(X) :
 
 pattern :
   | pattern colon typ { Pat.constraint_ ~loc:(to_loc $loc) $1 $3 }
-  | FUN? UNDERSCORE { Pat.any ~loc:(to_loc $loc) () }
+  | UNDERSCORE { Pat.any ~loc:(to_loc $loc) () }
   | const { let (pat, loc) = $1 in Pat.constant ~loc:(to_loc loc) pat }
+  // Allow rational numbers in patterns
+  | dash_op? NUMBER_INT slash_op dash_op? NUMBER_INT { Pat.constant ~loc:(to_loc $sloc) @@ Const.number (PConstNumberRational ((if Option.is_some $1 then "-" ^ $2 else $2), (if Option.is_some $4 then "-" ^ $5 else $5))) }
   /* If the pattern uses an external ID, we know it's a constructor, not a variable */
   // | ext_constructor { Pat.construct ~loc:(to_loc $loc) $1 [] }
-  | FUN? ID { Pat.var ~loc:(to_loc $loc) (mkstr $loc $2) }
-  | FUN? special_id { Pat.var ~loc:(to_loc $loc) (mkstr $loc $2) }
+  | ID { Pat.var ~loc:(to_loc $loc) (mkstr $loc $1) }
+  | special_id { Pat.var ~loc:(to_loc $loc) (mkstr $loc $1) }
   | primitive_ { Pat.var ~loc:(to_loc $loc) (mkstr $loc $1) }
-  // HACK: Some match cases look like functions
-  | FUN? lparen tuple_patterns rparen { Pat.tuple ~loc:(to_loc $loc) $3 }
+  | lparen tuple_patterns rparen { Pat.tuple ~loc:(to_loc $loc) $2 }
   | lbrackrcaret patterns rbrack { Pat.array ~loc:(to_loc $loc) $2 }
   | lbrackrcaret rbrack { Pat.array ~loc:(to_loc $loc) [] }
-  | FUN? lparen pattern rparen { $3 }
+  | lparen pattern rparen { $2 }
   | lbrace record_patterns rbrace { Pat.record ~loc:(to_loc $loc) $2 }
-  | type_id FUN? lparen patterns rparen { Pat.construct ~loc:(to_loc $loc) $1 $4 }
+  | type_id lparen patterns rparen { Pat.construct ~loc:(to_loc $loc) $1 $3 }
   | type_id { Pat.construct ~loc:(to_loc $loc) $1 [] }
   | lbrack lseparated_list(comma, list_item_pat) comma? rbrack { Pat.list ~loc:(to_loc $loc) $2 }
   // | lbrack ellipsis_prefix(any_or_var_pat)? rbrack { Pat.list ~loc:(to_loc $loc) [] $2 }
@@ -311,15 +312,15 @@ export_exception :
   | EXCEPT export_id_str comma_prefix(export_id_str)* {$2::$3}
 
 export_stmt :
-  | attributes EXPORT LET REC value_binds { Top.let_ ~loc:(to_loc $loc) ~attributes:$1 Exported Recursive Immutable $5 }
-  | attributes EXPORT LET value_binds { Top.let_ ~loc:(to_loc $loc) ~attributes:$1 Exported Nonrecursive Immutable $4 }
-  | attributes EXPORT LET REC MUT value_binds { Top.let_ ~loc:(to_loc $loc) ~attributes:$1 Exported Recursive Mutable $6 }
-  | attributes EXPORT LET MUT value_binds { Top.let_ ~loc:(to_loc $loc) ~attributes:$1 Exported Nonrecursive Mutable $5 }
-  | attributes EXPORT foreign_stmt { Top.foreign ~loc:(to_loc $loc) ~attributes:$1 Exported $3 }
-  | attributes EXPORT primitive_stmt { Top.primitive ~loc:(to_loc $loc) ~attributes:$1 Exported $3 }
-  | attributes EXPORT exception_stmt { Top.grain_exception ~loc:(to_loc $loc) ~attributes:$1 Exported $3 }
-  | attributes EXPORT separated_nonempty_list(comma, aliasable(any_id_str)) { Top.export ~loc:(to_loc $loc) ~attributes:$1 (Ex.mk ~loc:(to_loc $loc) $3) }
-  | attributes EXPORT STAR export_exception? { Top.export_all ~loc:(to_loc $loc) ~attributes:$1 (Option.value ~default:[] $4) }
+  | attributes EXPORT LET REC value_binds { Top.let_ ~loc:(to_loc $sloc) ~attributes:$1 Exported Recursive Immutable $5 }
+  | attributes EXPORT LET value_binds { Top.let_ ~loc:(to_loc $sloc) ~attributes:$1 Exported Nonrecursive Immutable $4 }
+  | attributes EXPORT LET REC MUT value_binds { Top.let_ ~loc:(to_loc $sloc) ~attributes:$1 Exported Recursive Mutable $6 }
+  | attributes EXPORT LET MUT value_binds { Top.let_ ~loc:(to_loc $sloc) ~attributes:$1 Exported Nonrecursive Mutable $5 }
+  | attributes EXPORT foreign_stmt { Top.foreign ~loc:(to_loc $sloc) ~attributes:$1 Exported $3 }
+  | attributes EXPORT primitive_stmt { Top.primitive ~loc:(to_loc $sloc) ~attributes:$1 Exported $3 }
+  | attributes EXPORT exception_stmt { Top.grain_exception ~loc:(to_loc $sloc) ~attributes:$1 Exported $3 }
+  | attributes EXPORT separated_nonempty_list(comma, aliasable(any_id_str)) { Top.export ~loc:(to_loc $sloc) ~attributes:$1 (Ex.mk ~loc:(to_loc $loc($3)) $3) }
+  | attributes EXPORT STAR export_exception? { Top.export_all ~loc:(to_loc $sloc) ~attributes:$1 (Option.value ~default:[] $4) }
 
 data_constructor :
   | TYPEID { CDecl.singleton ~loc:(to_loc $loc) (mkstr $loc $1) }
@@ -533,10 +534,10 @@ attributes :
   | attribute* { $1 }
 
 let_expr :
-  | attributes LET REC value_binds { Exp.let_ ~loc:(to_loc $loc) ~attributes:$1 Recursive Immutable $4 }
-  | attributes LET value_binds { Exp.let_ ~loc:(to_loc $loc) ~attributes:$1 Nonrecursive Immutable $3 }
-  | attributes LET REC MUT value_binds { Exp.let_ ~loc:(to_loc $loc) ~attributes:$1 Recursive Mutable $5 }
-  | attributes LET MUT value_binds { Exp.let_ ~loc:(to_loc $loc) ~attributes:$1 Nonrecursive Mutable $4 }
+  | attributes LET REC value_binds { Exp.let_ ~loc:(to_loc $sloc) ~attributes:$1 Recursive Immutable $4 }
+  | attributes LET value_binds { Exp.let_ ~loc:(to_loc $sloc) ~attributes:$1 Nonrecursive Immutable $3 }
+  | attributes LET REC MUT value_binds { Exp.let_ ~loc:(to_loc $sloc) ~attributes:$1 Recursive Mutable $5 }
+  | attributes LET MUT value_binds { Exp.let_ ~loc:(to_loc $sloc) ~attributes:$1 Nonrecursive Mutable $4 }
 
 %inline else_expr :
   | ELSE opt_eols block_or_expr { $3 }
@@ -748,10 +749,10 @@ exception_stmt :
   | EXCEPTION type_id_str lparen typs? rparen { Except.tuple ~loc:(to_loc $loc) $2 (Option.value ~default:[] $4) }
 
 toplevel_stmt :
-  | attributes LET REC value_binds { Top.let_ ~loc:(to_loc $loc) ~attributes:$1 Nonexported Recursive Immutable $4 }
-  | attributes LET value_binds { Top.let_ ~loc:(to_loc $loc) ~attributes:$1 Nonexported Nonrecursive Immutable $3 }
-  | attributes LET REC MUT value_binds { Top.let_ ~loc:(to_loc $loc) ~attributes:$1 Nonexported Recursive Mutable $5 }
-  | attributes LET MUT value_binds { Top.let_ ~loc:(to_loc $loc) ~attributes:$1 Nonexported Nonrecursive Mutable $4 }
+  | attributes LET REC value_binds { Top.let_ ~loc:(to_loc $sloc) ~attributes:$1 Nonexported Recursive Immutable $4 }
+  | attributes LET value_binds { Top.let_ ~loc:(to_loc $sloc) ~attributes:$1 Nonexported Nonrecursive Immutable $3 }
+  | attributes LET REC MUT value_binds { Top.let_ ~loc:(to_loc $sloc) ~attributes:$1 Nonexported Recursive Mutable $5 }
+  | attributes LET MUT value_binds { Top.let_ ~loc:(to_loc $sloc) ~attributes:$1 Nonexported Nonrecursive Mutable $4 }
   | expr { Top.expr ~loc:(to_loc $loc) $1 }
   | import_stmt { Top.import ~loc:(to_loc $loc) $1 }
   | IMPORT foreign_stmt { Top.foreign ~loc:(to_loc $loc) Nonexported $2 }
