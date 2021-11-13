@@ -302,8 +302,9 @@ let token = state => {
   | ([], None) =>
     switch (token(state)) {
     | MATCH as tok =>
+      let tok = save_triple(state.lexbuf, tok);
       lookahead_match(state);
-      save_triple(state.lexbuf, tok);
+      tok;
     | LPAREN as tok => lookahead_fun(state, save_triple(state.lexbuf, tok))
     | (ID(_) | UNDERSCORE) as tok =>
       let tok = save_triple(lexbuf, tok);
