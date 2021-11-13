@@ -2,8 +2,6 @@
 open Lexing;
 open Location;
 
-exception SyntaxError(Location.t, string);
-
 let apply_filename_to_lexbuf = (name, lexbuf) => {
   lexbuf.lex_curr_p = {...lexbuf.lex_curr_p, pos_fname: name};
   Location.input_name := name;
@@ -163,7 +161,10 @@ let fail = (text, buffer, checkpoint: I.checkpoint(_)) => {
   let message = E.expand(get(text, checkpoint), message);
   /* Show these three components. */
   raise(
-    SyntaxError(location, Printf.sprintf("%s%s%!", indication, message)),
+    Ast_helper.SyntaxError(
+      location,
+      Printf.sprintf("%s%s%!", indication, message),
+    ),
   );
 };
 
@@ -266,7 +267,7 @@ let print_syntax_error =
   Printf.(
     Location.(
       fun
-      | SyntaxError(loc, msg) => {
+      | Ast_helper.SyntaxError(loc, msg) => {
           Some(errorf(~loc, "%s", msg));
         }
       | _ => None

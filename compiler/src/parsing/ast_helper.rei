@@ -17,9 +17,11 @@
 
 open Parsetree;
 
+exception SyntaxError(Location.t, string);
+
 type listitem('a) =
   | ListItem('a)
-  | ListSpread('a);
+  | ListSpread('a, Location.t);
 
 type id = loc(Identifier.t);
 type str = loc(string);

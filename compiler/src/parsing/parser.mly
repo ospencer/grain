@@ -214,7 +214,8 @@ pattern :
   | lbrace record_patterns rbrace { Pat.record ~loc:(to_loc $loc) $2 }
   | type_id lparen patterns rparen { Pat.construct ~loc:(to_loc $loc) $1 $3 }
   | type_id { Pat.construct ~loc:(to_loc $loc) $1 [] }
-  | lbrack lseparated_list(comma, list_item_pat) comma? rbrack { Pat.list ~loc:(to_loc $loc) $2 }
+  | lbrack rbrack { Pat.list ~loc:(to_loc $loc) [] }
+  | lbrack lseparated_nonempty_list(comma, list_item_pat) comma? rbrack { Pat.list ~loc:(to_loc $loc) $2 }
   // | lbrack ellipsis_prefix(any_or_var_pat)? rbrack { Pat.list ~loc:(to_loc $loc) [] $2 }
 
 // any_or_var_pat :
@@ -222,7 +223,7 @@ pattern :
 //   | ID { Pat.var ~loc:(to_loc $loc) (mkstr $loc $1) }
 
 list_item_pat :
-  | ELLIPSIS pattern { ListSpread $2 }
+  | ELLIPSIS pattern { ListSpread ($2, to_loc $loc) }
   | pattern { ListItem $1 }
 
 comma_prefix(X) :
@@ -583,12 +584,12 @@ match_expr :
 //   | comma ELLIPSIS expr { $3 }
 
 list_item :
-  | ELLIPSIS expr { ListSpread $2 }
+  | ELLIPSIS expr { ListSpread ($2, to_loc $loc) }
   | expr { ListItem $1 }
 
 list_expr :
-  // | lbrack rbrack { Exp.list ~loc:(to_loc $loc) [] None }
-  | lbrack lseparated_list(comma, list_item) comma? rbrack { Exp.list ~loc:(to_loc $loc) $2 }
+  | lbrack rbrack { Exp.list ~loc:(to_loc $loc) [] }
+  | lbrack lseparated_nonempty_list(comma, list_item) comma? rbrack { Exp.list ~loc:(to_loc $loc) $2 }
 
 array_expr :
   | lbrackrcaret rbrack { Exp.array ~loc:(to_loc $loc) [] }

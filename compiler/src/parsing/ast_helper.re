@@ -17,9 +17,11 @@
 
 open Parsetree;
 
+exception SyntaxError(Location.t, string);
+
 type listitem('a) =
   | ListItem('a)
-  | ListSpread('a);
+  | ListSpread('a, Location.t);
 
 type id = loc(Identifier.t);
 type str = loc(string);
@@ -158,13 +160,19 @@ module Pat = {
       let base =
         switch (base) {
         | ListItem(pat) => construct(ident_cons, [pat, empty])
-        | ListSpread(pat) => pat
+        | ListSpread(pat, _) => pat
         };
       List.fold_left(
         (acc, pat) => {
           switch (pat) {
           | ListItem(pat) => construct(ident_cons, [pat, acc])
-          | _ => assert(false) //FIXME
+          | ListSpread(_, loc) =>
+            raise(
+              SyntaxError(
+                loc,
+                "A list spread can only appear at the end of a list.",
+              ),
+            )
           }
         },
         base,
@@ -259,13 +267,19 @@ module Exp = {
       let base =
         switch (base) {
         | ListItem(expr) => apply(~attributes?, cons, [expr, empty])
-        | ListSpread(expr) => expr
+        | ListSpread(expr, _) => expr
         };
       List.fold_left(
         (acc, expr) => {
           switch (expr) {
           | ListItem(expr) => apply(~attributes?, cons, [expr, acc])
-          | _ => assert(false) //FIXME
+          | ListSpread(_, loc) =>
+            raise(
+              SyntaxError(
+                loc,
+                "A list spread can only appear at the end of a list.",
+              ),
+            )
           }
         },
         base,
