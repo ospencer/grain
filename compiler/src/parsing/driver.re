@@ -7,110 +7,6 @@ let apply_filename_to_lexbuf = (name, lexbuf) => {
   Location.input_name := name;
 };
 
-open Parser;
-let string_of_tok =
-  fun
-  | WHILE => "WHILE"
-  | WHEN => "WHEN"
-  | WASMI64(s) => "WASMI64(" ++ s ++ ")"
-  | WASMI32(s) => "WASMI32(" ++ s ++ ")"
-  | WASMF64(s) => "WASMF64(" ++ s ++ ")"
-  | WASMF32(s) => "WASMF32(" ++ s ++ ")"
-  | WASM => "WASM"
-  | VOID => "VOID"
-  | UNDERSCORE => "UNDERSCORE"
-  | TYPEID(s) => "TYPEID(" ++ s ++ ")"
-  | TRY => "TRY"
-  | TRUE => "TRUE"
-  | THROW => "THROW"
-  | THICKARROW => "THICKARROW"
-  | STRING(s) => "STRING(" ++ s ++ ")"
-  | STAREQ => "STAREQ"
-  | STAR => "STAR"
-  | SLASHEQ => "SLASHEQ"
-  | SLASH => "SLASH"
-  | SEMI => "SEMI"
-  | RPAREN => "RPAREN"
-  | RECORD => "RECORD"
-  | REC => "REC"
-  | RCARETRCARETRCARET => "RCARETRCARETRCARET"
-  | RCARETRCARET => "RCARETRCARET"
-  | RCARET => "RCARET"
-  | RBRACK => "RBRACK"
-  | RBRACE => "RBRACE"
-  | PRIMITIVE => "PRIMITIVE"
-  | PLUSPLUS => "PLUSPLUS"
-  | PLUSEQ => "PLUSEQ"
-  | PLUS => "PLUS"
-  | PIPEPIPE => "PIPEPIPE"
-  | PIPE => "PIPE"
-  | PERCENTEQ => "PERCENTEQ"
-  | PERCENT => "PERCENT"
-  | NUMBER_INT(s) => "NUMBER_INT(" ++ s ++ ")"
-  | NUMBER_FLOAT(s) => "NUMBER_FLOAT(" ++ s ++ ")"
-  | NOTEQ => "NOTEQ"
-  | NOT => "NOT"
-  | MUT => "MUT"
-  | MATCH => "MATCH"
-  | LPAREN => "LPAREN"
-  | LET => "LET"
-  | LESSEQ => "LESSEQ"
-  | LCARETLCARET => "LCARETLCARET"
-  | LCARET => "LCARET"
-  | LBRACK => "LBRACK"
-  | LBRACKRCARET => "LBRACKRCARET"
-  | LBRACE => "LBRACE"
-  | ISNT => "ISNT"
-  | IS => "IS"
-  | INT64(s) => "INT64(" ++ s ++ ")"
-  | INT32(s) => "INT32(" ++ s ++ ")"
-  | IMPORT => "IMPORT"
-  | IF => "IF"
-  | ID(s) => "ID(" ++ s ++ ")"
-  | GREATEREQ => "GREATEREQ"
-  | GETS => "GETS"
-  | FUN => "FUN"
-  | FROM => "FROM"
-  | FOREIGN => "FOREIGN"
-  | FOR => "FOR"
-  | FLOAT64(s) => "FLOAT64(" ++ s ++ ")"
-  | FLOAT32(s) => "FLOAT32(" ++ s ++ ")"
-  | FALSE => "FALSE"
-  | FAIL => "FAIL"
-  | EXPORT => "EXPORT"
-  | EXCEPTION => "EXCEPTION"
-  | EXCEPT => "EXCEPT"
-  | EQUAL => "EQUAL"
-  | EQEQ => "EQEQ"
-  | EOL => "EOL"
-  | EOF => "EOF"
-  | ENUM => "ENUM"
-  | ELSE => "ELSE"
-  | ELLIPSIS => "ELLIPSIS"
-  | DOT => "DOT"
-  | DASHEQ => "DASHEQ"
-  | DASH => "DASH"
-  | CONTINUE => "CONTINUE"
-  | COMMA => "COMMA"
-  | COLONCOLON => "COLONCOLON"
-  | COLON => "COLON"
-  | CHAR(s) => "CHAR(" ++ s ++ ")"
-  | CATCH => "CATCH"
-  | CARET => "CARET"
-  | BREAK => "BREAK"
-  | AT => "AT"
-  | ASSERT => "ASSERT"
-  | AS => "AS"
-  | ARROW => "ARROW"
-  | AMPAMP => "AMPAMP"
-  | AMP => "AMP";
-
-let inspect_token = (token, lexbuf) => {
-  let tok = token(lexbuf);
-  Printf.eprintf("%s ", string_of_tok(tok));
-  tok;
-};
-
 // This parse is very fast, but cannot report useful errors.
 // parse_program_for_syntax_error is 2-5x slower, but has real
 // syntax error information.
@@ -175,10 +71,7 @@ let parse_program_for_syntax_error = (~name=?, lexbuf, source) => {
      function of type [unit -> token * position * position]. */
   let lexer = Wrapped_lexer.init(lexbuf);
   let supplier =
-    I.lexer_lexbuf_to_supplier(
-      inspect_token(_ => Wrapped_lexer.token(lexer)),
-      lexbuf,
-    );
+    I.lexer_lexbuf_to_supplier(_ => Wrapped_lexer.token(lexer), lexbuf);
   /* Equip the supplier with a two-place buffer that records the positions
      of the last two tokens. This is useful when a syntax error occurs, as
      these are the token just before and just after the error. */
