@@ -150,22 +150,22 @@ equal :
   | EQUAL opt_eols { () }
 
 const :
-  | dash_op? NUMBER_INT { Const.number (PConstNumberInt (if Option.is_some $1 then "-" ^ $2 else $2)) }
-  | dash_op? NUMBER_FLOAT { Const.number (PConstNumberFloat (if Option.is_some $1 then "-" ^ $2 else $2)) }
+  | dash_op? NUMBER_INT { Const.number (PConstNumberInt (if Option.is_some $1 then "-" ^ $2 else $2)), if Option.is_some $1 then $loc else $loc($2) }
+  | dash_op? NUMBER_FLOAT { Const.number (PConstNumberFloat (if Option.is_some $1 then "-" ^ $2 else $2)), if Option.is_some $1 then $loc else $loc($2) }
   // | dash_op? NUMBER_INT slash_op dash_op? NUMBER_INT { Const.number (PConstNumberRational ((if Option.is_some $1 then "-" ^ $2 else $2), (if Option.is_some $4 then "-" ^ $5 else $5))) }
-  | dash_op? INT32 { Const.int32 (if Option.is_some $1 then "-" ^ $2 else $2) }
-  | dash_op? INT64 { Const.int64 (if Option.is_some $1 then "-" ^ $2 else $2) }
-  | dash_op? FLOAT32 { Const.float32 (if Option.is_some $1 then "-" ^ $2 else $2) }
-  | dash_op? FLOAT64 { Const.float64 (if Option.is_some $1 then "-" ^ $2 else $2) }
-  | dash_op? WASMI32 { Const.wasmi32 (if Option.is_some $1 then "-" ^ $2 else $2) }
-  | dash_op? WASMI64 { Const.wasmi64 (if Option.is_some $1 then "-" ^ $2 else $2) }
-  | dash_op? WASMF32 { Const.wasmf32 (if Option.is_some $1 then "-" ^ $2 else $2) }
-  | dash_op? WASMF64 { Const.wasmf64 (if Option.is_some $1 then "-" ^ $2 else $2) }
-  | TRUE { Const.bool true }
-  | FALSE { Const.bool false }
-  | VOID { Const.void }
-  | STRING { Const.string $1 }
-  | CHAR { Const.char $1 }
+  | dash_op? INT32 { Const.int32 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
+  | dash_op? INT64 { Const.int64 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
+  | dash_op? FLOAT32 { Const.float32 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
+  | dash_op? FLOAT64 { Const.float64 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
+  | dash_op? WASMI32 { Const.wasmi32 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
+  | dash_op? WASMI64 { Const.wasmi64 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
+  | dash_op? WASMF32 { Const.wasmf32 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
+  | dash_op? WASMF64 { Const.wasmf64 (if Option.is_some $1 then "-" ^ $2 else $2), if Option.is_some $1 then $loc else $loc($2) }
+  | TRUE { Const.bool true, $loc }
+  | FALSE { Const.bool false, $loc }
+  | VOID { Const.void, $loc }
+  | STRING { Const.string $1, $loc }
+  | CHAR { Const.char $1, $loc }
 
 expr :
   | stmt_expr { $1 }
@@ -199,7 +199,7 @@ ellipsis_prefix(X) :
 pattern :
   | pattern colon typ { Pat.constraint_ ~loc:(to_loc $loc) $1 $3 }
   | FUN? UNDERSCORE { Pat.any ~loc:(to_loc $loc) () }
-  | const { Pat.constant ~loc:(to_loc $loc) $1 }
+  | const { let (pat, loc) = $1 in Pat.constant ~loc:(to_loc loc) pat }
   /* If the pattern uses an external ID, we know it's a constructor, not a variable */
   // | ext_constructor { Pat.construct ~loc:(to_loc $loc) $1 [] }
   | FUN? ID { Pat.var ~loc:(to_loc $loc) (mkstr $loc $2) }
@@ -507,7 +507,7 @@ id_expr :
   | id %prec COLON { Exp.ident ~loc:(to_loc $loc) $1 }
 
 simple_expr :
-  | const { Exp.constant ~loc:(to_loc $loc) $1 }
+  | const { let (exp, loc) = $1 in Exp.constant ~loc:(to_loc loc) exp }
   | lparen tuple_exprs rparen { Exp.tuple ~loc:(to_loc $loc) $2 }
   | id_expr { $1 }
 
