@@ -81,12 +81,28 @@ module Grain_parsing = struct end
 
 %start <Parsetree.parsed_program> program
 
+%on_error_reduce eols
+                 record_get
+                 array_get
+                 non_assign_expr
+                 annotated_expr
+                 expr
+                 id_expr
+                 lbrace
+                 lbrack
+                 lbrackrcaret
+                 lparen
+                 comma
+                 const
+                 pattern
+                 type_id
+                 value_binds
 %%
 
 %inline eol :
   | EOL { () }
 
-%inline eols :
+eols :
   | eol+ { () }
 
 // eols :
@@ -127,8 +143,8 @@ lcaret :
 rcaret :
   | opt_eols RCARET { () }
 
-%inline comma :
-  | COMMA opt_eols { () }
+comma :
+  | COMMA opt_eols %prec COMMA { () }
 
 /* prevents abiguity between EOL characters after the final comma and before the closing character */
 // %inline trailing_comma :
@@ -182,7 +198,7 @@ non_stmt_expr :
   | binop_expr { $1 }
   | annotated_expr { $1 }
 
-annotation :
+%inline annotation :
   | %prec COLON { None }
   | colon typ { Some $2 }
 
@@ -226,8 +242,8 @@ list_item_pat :
   | ELLIPSIS pattern { ListSpread ($2, to_loc $loc) }
   | pattern { ListItem $1 }
 
-comma_prefix(X) :
-  | comma X {$2}
+// comma_prefix(X) :
+//   | comma X {$2}
 
 patterns :
   | lseparated_nonempty_list(comma, pattern) comma? { $1 }
@@ -279,7 +295,8 @@ value_bind :
   | pattern equal expr { Vb.mk ~loc:(to_loc $loc) $1 $3 }
 
 value_binds :
-  | value_bind comma_prefix(value_bind)* { $1::$2 }
+  // | value_bind comma_prefix(value_bind)* { $1::$2 }
+  | lseparated_nonempty_list(comma, value_bind) { $1 }
 
 import_exception :
   | EXCEPT lbrace lseparated_nonempty_list(comma, id) comma? rbrace {$3}
@@ -310,7 +327,8 @@ data_declaration_stmts :
   | separated_nonempty_list(comma, data_declaration_stmt) { $1 }
 
 export_exception :
-  | EXCEPT export_id_str comma_prefix(export_id_str)* {$2::$3}
+  // | EXCEPT export_id_str comma_prefix(export_id_str)* {$2::$3}
+  | EXCEPT lseparated_nonempty_list(comma, export_id_str) {$2}
 
 export_stmt :
   | attributes EXPORT LET REC value_binds { Top.let_ ~loc:(to_loc $sloc) ~attributes:$1 Exported Recursive Immutable $5 }
@@ -345,7 +363,8 @@ id_typ :
   | ID { Typ.var ~loc:(to_loc $loc) $1 }
 
 id_vec :
-  | lcaret id_typ comma_prefix(id_typ)* rcaret {$2::$3}
+  // | lcaret id_typ comma_prefix(id_typ)* rcaret {$2::$3}
+  | lcaret lseparated_nonempty_list(comma, id_typ) rcaret {$2}
 
 data_declaration :
   | ENUM TYPEID id_vec? data_constructors { Dat.variant ~loc:(to_loc $loc) (mkstr $loc $2) (Option.value ~default:[] $3) $4 }
@@ -501,7 +520,7 @@ simple_id :
   | ID { (mkid [$1]) (to_loc $loc) }
 
 type_id :
-  | separated_nonempty_list(dot, TYPEID) { (mkid $1) (to_loc $loc) }
+  | lseparated_nonempty_list(dot, TYPEID) { (mkid $1) (to_loc $loc) }
   // | TYPEID dot_prefix(TYPEID)* { (mkid ($1::$2)) (to_loc $loc) }
 
 id_expr :

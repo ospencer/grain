@@ -28,6 +28,19 @@
   --unused-tokens
   --unused-precedence-levels))
 
+;; This rule compiles the parser.messages file into OCaml code.
+
+(rule
+ (action
+  (with-stdout-to
+   parser_messages.ml
+   (run
+    menhir
+    %{dep:parser.mly}
+    --compile-errors
+    %{dep:parser.messages}
+    --unused-tokens))))
+
 (library
  (name grain_parsing)
  (public_name grain_parsing)

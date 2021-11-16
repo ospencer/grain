@@ -51,8 +51,7 @@ let fail = (text, buffer, checkpoint: I.checkpoint(_)) => {
   let indication =
     Printf.sprintf("Syntax error %s.\n", E.show(show(text), buffer));
   /* Fetch an error message from the database. */
-  // let message = ParserMessages.message(state(checkpoint));
-  let message = "WHOOPS.\n";
+  let message = Parser_messages.message(state(checkpoint));
   /* Expand away the $i keywords that might appear in the message. */
   let message = E.expand(get(text, checkpoint), message);
   /* Show these three components. */
