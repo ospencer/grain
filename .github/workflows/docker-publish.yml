@@ -19,7 +19,7 @@ jobs:
         # This step converts Grain tags into standard semver, i.e. grain-v1.2.3 -> v1.2.3
         id: vars
         if: ${{ github.event.inputs.tag }}
-        run: GITHUB_TAG=${{ github.event.inputs.tag }} echo ::set-output name=tag::${GITHUB_TAG#grain-}
+        run: GITHUB_TAG=${{ github.event.inputs.tag }}; echo ::set-output name=tag::${GITHUB_TAG#grain-}
 
       - name: Docker meta
         id: meta
@@ -66,7 +66,7 @@ jobs:
         # This step converts Grain tags into standard semver, i.e. grain-v1.2.3 -> v1.2.3
         id: vars
         if: ${{ github.event.inputs.tag }}
-        run: GITHUB_TAG=${{ github.event.inputs.tag }} echo ::set-output name=tag::${GITHUB_TAG#grain-}
+        run: GITHUB_TAG=${{ github.event.inputs.tag }}; echo ::set-output name=tag::${GITHUB_TAG#grain-}
 
       - name: Docker meta
         id: meta
