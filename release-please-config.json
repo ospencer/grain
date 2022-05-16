@@ -1,7 +1,8 @@
 {
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
-  "last-release-sha": "07233c67464484eaa2e1a8fbdb52033e08ecd65a",
+  "last-release-sha": "76b3450f3ff0fca7697a6f56160c00815bf0fb06",
+  "bootstrap-sha": "76b3450f3ff0fca7697a6f56160c00815bf0fb06",
   "plugins": [
     "node-workspace",
     {
