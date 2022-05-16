@@ -18,7 +18,7 @@ import Exception from "runtime/exception"
  */
 
 @disableGC
-let mut _ARRAY_LENGTH_OFFSET = 1n
+let mut _ARRAY_LENGTH_OFFSET = 2n
 @disableGC
 let mut _ARRAY_START_OFFSET = 1n
 
