@@ -1,5 +1,12 @@
 # Changelog
 
+### [0.4.4](https://github.com/ospencer/grain/compare/stdlib-v0.4.3...stdlib-v0.4.4) (2022-05-16)
+
+
+### Features
+
+* **stdlib:** Add sort function to Array module ([#1012](https://github.com/ospencer/grain/issues/1012)) ([9091930](https://github.com/ospencer/grain/commit/9091930344224925bb7b2e1ef6f879c79a5c2f62))
+
 ### [0.4.3](https://www.github.com/grain-lang/grain/compare/stdlib-v0.4.2...stdlib-v0.4.3) (2021-10-27)
 
 
