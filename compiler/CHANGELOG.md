@@ -1,5 +1,20 @@
 # Changelog
 
+### [0.4.4](https://github.com/ospencer/grain/compare/@grain/compiler-v0.4.3...@grain/compiler-v0.4.4) (2022-05-16)
+
+
+### Features
+
+* **stdlib:** Add sort function to Array module ([#1012](https://github.com/ospencer/grain/issues/1012)) ([9091930](https://github.com/ospencer/grain/commit/9091930344224925bb7b2e1ef6f879c79a5c2f62))
+
+
+### Bug Fixes
+
+* **compiler:** Allow modules to re-export imported types containing generics ([#1019](https://github.com/ospencer/grain/issues/1019)) ([003cb1e](https://github.com/ospencer/grain/commit/003cb1e10ca51c3f16d2155581eb8dccdde3ce5c))
+* **compiler:** Fix binop operator reported location ([#1018](https://github.com/ospencer/grain/issues/1018)) ([422dbcb](https://github.com/ospencer/grain/commit/422dbcb01cd09627c6a5f4494cc7c2e7644e92f0))
+* **grainfmt:** Handle recursive enums ([7dc77cd](https://github.com/ospencer/grain/commit/7dc77cd3ec28745dfad6cdbd1551c09a82a1ba6b))
+* **grainfmt:** Resugar match lists properly ([7dc77cd](https://github.com/ospencer/grain/commit/7dc77cd3ec28745dfad6cdbd1551c09a82a1ba6b))
+
 ### [0.4.3](https://www.github.com/grain-lang/grain/compare/@grain/compiler-v0.4.2...@grain/compiler-v0.4.3) (2021-10-27)
 
 
